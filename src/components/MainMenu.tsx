@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useGame } from '../store/gameStore'
 import { MAP_LIST } from '../game/maps'
+import { WARLOCK_KIND_LIST } from '../game/constants'
 
 const BOT_OPTIONS = [1, 2, 3, 4]
 const SCORE_OPTIONS = [3, 5, 7]
@@ -11,6 +12,7 @@ export function MainMenu() {
   const [bots, setBots] = useState(config.bots)
   const [targetScore, setTargetScore] = useState(config.targetScore)
   const [mapId, setMapId] = useState(config.mapId)
+  const [kind, setKind] = useState(config.kind)
 
   return (
     <div className="menu">
@@ -65,7 +67,22 @@ export function MainMenu() {
           </div>
         </div>
 
-        <button className="play" onClick={() => startGame({ bots, targetScore, mapId })}>
+        <div className="field">
+          <label>Warlock</label>
+          <div className="seg">
+            {WARLOCK_KIND_LIST.map((k) => (
+              <button
+                key={k.id}
+                className={k.id === kind ? 'on' : ''}
+                onClick={() => setKind(k.id)}
+              >
+                {k.name}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <button className="play" onClick={() => startGame({ bots, targetScore, mapId, kind })}>
           ENTER THE ARENA
         </button>
 
@@ -74,6 +91,7 @@ export function MainMenu() {
           <div><b>Q · Bolt</b> — skillshot that knocks foes back</div>
           <div><b>W · Burst</b> — shove everyone near you outward</div>
           <div><b>E · Blink</b> — dash toward the cursor &amp; shed knockback</div>
+          <div className="muted">Snow warlock&apos;s Bolt throws ice — hits slow the target by 50%.</div>
           <div className="muted">The lava creeps inward each round — keep moving.</div>
         </div>
       </div>

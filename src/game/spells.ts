@@ -51,6 +51,7 @@ function castBolt(state: GameState, caster: Warlock, aim: Vec2): void {
   if (dir.x === 0 && dir.y === 0) dir = fromAngle(caster.facing)
   caster.facing = angle(dir)
   const spawn = add(caster.pos, scale(dir, caster.radius + 8))
+  const isIce = caster.kind === 'snow'
   state.projectiles.push({
     id: state.nextProjectileId++,
     ownerId: caster.id,
@@ -60,8 +61,9 @@ function castBolt(state: GameState, caster: Warlock, aim: Vec2): void {
     damage: C.BOLT_DAMAGE,
     knockback: C.BOLT_KNOCKBACK,
     life: C.BOLT_RANGE / C.BOLT_SPEED,
-    color: caster.color,
+    color: isIce ? C.ICE_COLOR : caster.color,
     trail: [],
+    slow: isIce ? C.ICE_SLOW_DURATION : undefined,
   })
 }
 

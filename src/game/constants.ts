@@ -1,3 +1,5 @@
+import type { WarlockKind } from './types'
+
 // --- Simulation ---
 export const SIM_HZ = 60
 export const SIM_DT = 1 / SIM_HZ
@@ -29,6 +31,13 @@ export const FRICTION = 2.1 // velocity decay coefficient (higher = stops faster
 export const WALK_CANCEL_SPEED = 95 // above this slide speed you can't walk (pure slide)
 export const LAVA_DPS = 28
 
+// --- Warlock kinds ---
+// Snow warlock's Bolt throws ice that slows the target's movement.
+export const SNOW_COLOR = '#8fd8ff' // snow player body tint
+export const ICE_COLOR = '#bdebff' // ice-bolt projectile / frost FX
+export const ICE_SLOW_FACTOR = 0.5 // movement multiplier while slowed (50%)
+export const ICE_SLOW_DURATION = 2.0 // seconds the slow lasts
+
 // --- Round flow (seconds) ---
 export const COUNTDOWN_TIME = 2.2
 export const ROUNDOVER_TIME = 2.8
@@ -51,6 +60,11 @@ export const BURST_COOLDOWN = 7
 // --- Spell: Blink (E) ---
 export const BLINK_RANGE = 230
 export const BLINK_COOLDOWN = 5
+
+export const WARLOCK_KIND_LIST: { id: WarlockKind; name: string }[] = [
+  { id: 'arcane', name: 'Arcane' },
+  { id: 'snow', name: 'Snow' },
+]
 
 export const PLAYER_COLOR = '#46c6ff'
 export const BOT_COLORS = ['#ff5a5a', '#7be36a', '#ffd24a', '#c77dff', '#ff9d3a']

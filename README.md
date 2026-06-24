@@ -35,6 +35,14 @@ Pick one from the main menu (the **Arena** selector). All three shrink each roun
 - **Square** — a shrinking square platform.
 - **Rectangle** — a wide arena with a **fixed lava square in the center** to fight around.
 
+## Warlocks
+
+Pick your kind from the main menu (the **Warlock** selector):
+
+- **Arcane** — the classic warlock; Bolt deals damage + knockback.
+- **Snow** — Bolt throws **ice**: same damage/knockback, and hits **slow the target's
+  movement by 50%** for a couple of seconds (shown as a dashed frost ring). Bots are Arcane.
+
 ## Layout
 
 ```

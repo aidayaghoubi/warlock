@@ -7,6 +7,8 @@ export type SpellId = 'bolt' | 'burst' | 'blink'
 
 export type MapId = 'circle' | 'square' | 'rect'
 
+export type WarlockKind = 'arcane' | 'snow'
+
 export interface AIState {
   thinkTimer: number
   aimError: number
@@ -16,6 +18,7 @@ export interface AIState {
 export interface Warlock {
   id: number
   name: string
+  kind: WarlockKind
   color: string
   isPlayer: boolean
   alive: boolean
@@ -29,6 +32,7 @@ export interface Warlock {
   cooldowns: Record<SpellId, number>
   score: number
   safeTime: number
+  slowTimer: number // seconds of remaining movement slow (from ice)
   ai: AIState | null
 }
 
@@ -43,6 +47,7 @@ export interface Projectile {
   life: number
   color: string
   trail: Vec2[]
+  slow?: number // if set, seconds of movement slow applied on hit (ice bolt)
 }
 
 export interface Particle {

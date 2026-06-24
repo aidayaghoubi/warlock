@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { HudSnapshot, MapId } from '../game/types'
+import type { HudSnapshot, MapId, WarlockKind } from '../game/types'
 
 export type Screen = 'menu' | 'playing' | 'gameover'
 
@@ -7,6 +7,7 @@ export interface MatchConfig {
   bots: number
   targetScore: number
   mapId: MapId
+  kind: WarlockKind
 }
 
 interface GameStore {
@@ -24,7 +25,7 @@ interface GameStore {
 export const useGame = create<GameStore>((set) => ({
   screen: 'menu',
   gameId: 0,
-  config: { bots: 2, targetScore: 5, mapId: 'circle' },
+  config: { bots: 2, targetScore: 5, mapId: 'circle', kind: 'arcane' },
   hud: null,
   winner: null,
   startGame: (config) =>

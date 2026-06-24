@@ -168,6 +168,18 @@ function drawWarlock(
     ctx.stroke()
   }
 
+  // frost ring while slowed by ice
+  if (wl.slowTimer > 0) {
+    ctx.save()
+    ctx.strokeStyle = 'rgba(189,235,255,0.85)'
+    ctx.lineWidth = 2
+    ctx.setLineDash([4, 4])
+    ctx.beginPath()
+    ctx.arc(x, y, r * 1.35, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.restore()
+  }
+
   // hp bar
   const bw = r * 2.6
   const bh = 5

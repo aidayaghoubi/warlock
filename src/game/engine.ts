@@ -1,5 +1,5 @@
 import * as C from './constants'
-import type { GameState, HudSnapshot, MapId, Vec2, Warlock } from './types'
+import type { GameState, HudSnapshot, MapId, Vec2, Warlock, WarlockKind } from './types'
 import { angle, clamp, dist, len, norm, rand, scale, sub } from './math'
 import { Input } from './input'
 import { aiUpdate } from './ai'
@@ -12,6 +12,7 @@ export interface EngineConfig {
   bots: number
   targetScore: number
   mapId: MapId
+  kind: WarlockKind // the player's warlock kind
 }
 
 export interface EngineCallbacks {
@@ -19,10 +20,17 @@ export interface EngineCallbacks {
   onMatchOver: (winner: string | null) => void
 }
 
-function makeWarlock(id: number, name: string, color: string, isPlayer: boolean): Warlock {
+function makeWarlock(
+  id: number,
+  name: string,
+  kind: WarlockKind,
+  color: string,
+  isPlayer: boolean,
+): Warlock {
   return {
     id,
     name,
+    kind,
     color,
     isPlayer,
     alive: true,
@@ -36,6 +44,7 @@ function makeWarlock(id: number, name: string, color: string, isPlayer: boolean)
     cooldowns: { bolt: 0, burst: 0, blink: 0 },
     score: 0,
     safeTime: 0,
+    slowTimer: 0,
     ai: isPlayer ? null : { thinkTimer: 0, aimError: rand(60, 130), desiredRange: rand(175, 255) },
   }
 }
@@ -62,12 +71,14 @@ export class Engine {
   constructor(cfg: EngineConfig, cb: EngineCallbacks) {
     this.cfg = cfg
     this.cb = cb
-    const warlocks: Warlock[] = [makeWarlock(0, 'You', C.PLAYER_COLOR, true)]
+    const playerColor = cfg.kind === 'snow' ? C.SNOW_COLOR : C.PLAYER_COLOR
+    const warlocks: Warlock[] = [makeWarlock(0, 'You', cfg.kind, playerColor, true)]
     for (let i = 0; i < cfg.bots; i++) {
       warlocks.push(
         makeWarlock(
           i + 1,
           C.BOT_NAMES[i % C.BOT_NAMES.length],
+          'arcane',
           C.BOT_COLORS[i % C.BOT_COLORS.length],
           false,
         ),
@@ -205,6 +216,7 @@ export class Engine {
       w.alive = true
       w.moveTarget = null
       w.safeTime = C.SAFE_TIME
+      w.slowTimer = 0
       w.facing = angle(this.map.safeDir(w.pos, 0)) // face toward safety / center
       w.cooldowns = { bolt: 0, burst: 0, blink: 0 }
       if (w.ai) w.ai.thinkTimer = rand(0, 0.2)
@@ -235,6 +247,7 @@ export class Engine {
       if (w.cooldowns[id] > 0) w.cooldowns[id] = Math.max(0, w.cooldowns[id] - dt)
     }
     if (w.safeTime > 0) w.safeTime -= dt
+    if (w.slowTimer > 0) w.slowTimer -= dt
 
     // knockback friction
     const decay = Math.exp(-C.FRICTION * dt)
@@ -249,9 +262,10 @@ export class Engine {
         const speed = len(w.vel)
         const factor = clamp(1 - speed / C.WALK_CANCEL_SPEED, 0, 1)
         if (factor > 0) {
+          const walk = C.WALK_SPEED * (w.slowTimer > 0 ? C.ICE_SLOW_FACTOR : 1)
           const dir = scale(to, 1 / d)
-          w.pos.x += dir.x * C.WALK_SPEED * factor * dt
-          w.pos.y += dir.y * C.WALK_SPEED * factor * dt
+          w.pos.x += dir.x * walk * factor * dt
+          w.pos.y += dir.y * walk * factor * dt
         }
       } else {
         w.moveTarget = null
@@ -292,6 +306,7 @@ export class Engine {
           const dir = norm(p.vel)
           applyKnockback(w, dir, p.knockback)
           dealDamage(w, p.damage)
+          if (p.slow) w.slowTimer = Math.max(w.slowTimer, p.slow)
           spawnHit(s, p.pos, dir, p.color)
           hit = true
           break
@@ -374,7 +389,7 @@ export class Engine {
       const cd = p.cooldowns[id]
       return {
         id,
-        name: def.name,
+        name: p.kind === 'snow' && id === 'bolt' ? 'Frostbolt' : def.name,
         key: def.key,
         ready: cd <= 0,
         cooldownPct: clamp(cd / def.cooldown, 0, 1),
