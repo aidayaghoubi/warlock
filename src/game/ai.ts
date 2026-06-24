@@ -69,7 +69,7 @@ function nearestEnemy(state: GameState, bot: Warlock): Warlock | null {
   let best: Warlock | null = null
   let bd = Infinity
   for (const w of state.warlocks) {
-    if (w.id === bot.id || !w.alive) continue
+    if (w.id === bot.id || !w.alive || w.invisTimer > 0) continue // can't see invisible foes
     const d = dist(w.pos, bot.pos)
     if (d < bd) {
       bd = d

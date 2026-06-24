@@ -43,8 +43,10 @@ Pick your kind from the main menu (the **Warlock** selector):
 - **Snow** — Bolt throws **ice**: same damage/knockback, and hits **slow the target's
   movement by 50%** for a couple of seconds (shown as a dashed frost ring).
 - **Nature** — Bolt is a **green thorn** that **roots** the target in place for 2s (can't move,
-  but can still be knocked). Has **no Blink**; instead it **regenerates HP** over time. Bots are
-  Arcane.
+  but can still be knocked). Has **no Blink**; instead it **regenerates HP** over time.
+- **Assassin** — Bolt is **black** and deals damage with **no knockback**. In the W slot it goes
+  **invisible** for 2s (bots can't target it); **passing through a foe while invisible** deals heavy
+  damage and breaks stealth. Keeps Blink. Bots are Arcane.
 
 ## Layout
 

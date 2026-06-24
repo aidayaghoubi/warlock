@@ -4,7 +4,15 @@ import { angle, clamp, dist, len, norm, rand, scale, sub } from './math'
 import { Input } from './input'
 import { aiUpdate } from './ai'
 import { MAPS } from './maps'
-import { applyKnockback, castSpell, dealDamage, KIND_SPELLS, SPELLS, SPELL_ORDER } from './spells'
+import {
+  applyKnockback,
+  castSpell,
+  dealDamage,
+  KIND_SPELLS,
+  spellCooldown,
+  SPELLS,
+  SPELL_ORDER,
+} from './spells'
 import { spawnDeath, spawnHit } from './effects'
 import { draw } from './render'
 
@@ -46,6 +54,7 @@ function makeWarlock(
     safeTime: 0,
     slowTimer: 0,
     rootTimer: 0,
+    invisTimer: 0,
     ai: isPlayer ? null : { thinkTimer: 0, aimError: rand(60, 130), desiredRange: rand(175, 255) },
   }
 }
@@ -73,7 +82,13 @@ export class Engine {
     this.cfg = cfg
     this.cb = cb
     const playerColor =
-      cfg.kind === 'snow' ? C.SNOW_COLOR : cfg.kind === 'nature' ? C.NATURE_COLOR : C.PLAYER_COLOR
+      cfg.kind === 'snow'
+        ? C.SNOW_COLOR
+        : cfg.kind === 'nature'
+          ? C.NATURE_COLOR
+          : cfg.kind === 'assassin'
+            ? C.ASSASSIN_COLOR
+            : C.PLAYER_COLOR
     const warlocks: Warlock[] = [makeWarlock(0, 'You', cfg.kind, playerColor, true)]
     for (let i = 0; i < cfg.bots; i++) {
       warlocks.push(
@@ -220,6 +235,7 @@ export class Engine {
       w.safeTime = C.SAFE_TIME
       w.slowTimer = 0
       w.rootTimer = 0
+      w.invisTimer = 0
       w.facing = angle(this.map.safeDir(w.pos, 0)) // face toward safety / center
       w.cooldowns = { bolt: 0, burst: 0, blink: 0 }
       if (w.ai) w.ai.thinkTimer = rand(0, 0.2)
@@ -252,6 +268,7 @@ export class Engine {
     if (w.safeTime > 0) w.safeTime -= dt
     if (w.slowTimer > 0) w.slowTimer -= dt
     if (w.rootTimer > 0) w.rootTimer -= dt
+    if (w.invisTimer > 0) w.invisTimer -= dt
 
     // knockback friction
     const decay = Math.exp(-C.FRICTION * dt)
@@ -279,6 +296,19 @@ export class Engine {
     // knockback slide
     w.pos.x += w.vel.x * dt
     w.pos.y += w.vel.y * dt
+
+    // assassin stealth: passing through a foe while invisible strikes hard (and breaks stealth)
+    if (w.kind === 'assassin' && w.invisTimer > 0) {
+      for (const e of this.state.warlocks) {
+        if (e.id === w.id || !e.alive || e.safeTime > 0) continue
+        if (dist(w.pos, e.pos) <= w.radius + e.radius) {
+          dealDamage(e, C.STEALTH_STRIKE_DAMAGE)
+          spawnHit(this.state, e.pos, norm(sub(e.pos, w.pos)), C.SHADOW_BOLT_COLOR)
+          w.invisTimer = 0
+          break
+        }
+      }
+    }
 
     // lava damage when off the platform
     if (w.safeTime <= 0 && !this.map.isSafe(w.pos, this.state.roundTime)) {
@@ -395,16 +425,25 @@ export class Engine {
     const s = this.state
     const p = this.player()
     const boltName =
-      p.kind === 'snow' ? 'Frostbolt' : p.kind === 'nature' ? 'Thornbolt' : SPELLS.bolt.name
+      p.kind === 'snow'
+        ? 'Frostbolt'
+        : p.kind === 'nature'
+          ? 'Thornbolt'
+          : p.kind === 'assassin'
+            ? 'Shadowbolt'
+            : SPELLS.bolt.name
     const spells = KIND_SPELLS[p.kind].map((id) => {
       const def = SPELLS[id]
       const cd = p.cooldowns[id]
+      const maxCd = spellCooldown(p.kind, id)
+      const name =
+        id === 'bolt' ? boltName : id === 'burst' && p.kind === 'assassin' ? 'Stealth' : def.name
       return {
         id,
-        name: id === 'bolt' ? boltName : def.name,
+        name,
         key: def.key,
         ready: cd <= 0,
-        cooldownPct: clamp(cd / def.cooldown, 0, 1),
+        cooldownPct: clamp(cd / maxCd, 0, 1),
       }
     })
 

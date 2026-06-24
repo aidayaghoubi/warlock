@@ -18,11 +18,21 @@ export const SPELLS: Record<SpellId, SpellDef> = {
 
 export const SPELL_ORDER: SpellId[] = ['bolt', 'burst', 'blink']
 
-/** Active spells available to each warlock kind. Nature trades Blink for passive regen. */
+/**
+ * Active spells available to each warlock kind. Nature trades Blink for passive regen.
+ * The 'burst' entry is the "W slot" — assassins cast Stealth there instead of Burst.
+ */
 export const KIND_SPELLS: Record<WarlockKind, SpellId[]> = {
   arcane: ['bolt', 'burst', 'blink'],
   snow: ['bolt', 'burst', 'blink'],
   nature: ['bolt', 'burst'],
+  assassin: ['bolt', 'burst', 'blink'],
+}
+
+/** Cooldown for a kind's spell slot (assassin's W slot is Stealth, with its own cooldown). */
+export function spellCooldown(kind: WarlockKind, id: SpellId): number {
+  if (kind === 'assassin' && id === 'burst') return C.STEALTH_COOLDOWN
+  return SPELLS[id].cooldown
 }
 
 export function applyKnockback(w: Warlock, dir: Vec2, mag: number): void {
@@ -44,14 +54,21 @@ export function castSpell(state: GameState, caster: Warlock, id: SpellId, aim: V
       castBolt(state, caster, aim)
       break
     case 'burst':
-      castBurst(state, caster)
+      if (caster.kind === 'assassin') castStealth(state, caster)
+      else castBurst(state, caster)
       break
     case 'blink':
       castBlink(state, caster, aim)
       break
   }
-  caster.cooldowns[id] = SPELLS[id].cooldown
+  caster.cooldowns[id] = spellCooldown(caster.kind, id)
   return true
+}
+
+/** Assassin Stealth: vanish for a few seconds; passing through a foe while invisible strikes hard. */
+function castStealth(state: GameState, caster: Warlock): void {
+  caster.invisTimer = C.STEALTH_DURATION
+  spawnSpray(state, caster.pos, C.SHADOW_BOLT_COLOR, 16, 150)
 }
 
 function castBolt(state: GameState, caster: Warlock, aim: Vec2): void {
@@ -61,6 +78,7 @@ function castBolt(state: GameState, caster: Warlock, aim: Vec2): void {
   const spawn = add(caster.pos, scale(dir, caster.radius + 8))
   const isIce = caster.kind === 'snow'
   const isNature = caster.kind === 'nature'
+  const isShadow = caster.kind === 'assassin'
   state.projectiles.push({
     id: state.nextProjectileId++,
     ownerId: caster.id,
@@ -68,9 +86,15 @@ function castBolt(state: GameState, caster: Warlock, aim: Vec2): void {
     vel: scale(dir, C.BOLT_SPEED),
     radius: C.BOLT_RADIUS,
     damage: C.BOLT_DAMAGE,
-    knockback: C.BOLT_KNOCKBACK,
+    knockback: isShadow ? 0 : C.BOLT_KNOCKBACK, // shadow bolts deal damage but no knockback
     life: C.BOLT_RANGE / C.BOLT_SPEED,
-    color: isIce ? C.ICE_COLOR : isNature ? C.NATURE_BOLT_COLOR : C.FIRE_COLOR,
+    color: isIce
+      ? C.ICE_COLOR
+      : isNature
+        ? C.NATURE_BOLT_COLOR
+        : isShadow
+          ? C.SHADOW_BOLT_COLOR
+          : C.FIRE_COLOR,
     trail: [],
     slow: isIce ? C.ICE_SLOW_DURATION : undefined,
     root: isNature ? C.NATURE_ROOT_DURATION : undefined,

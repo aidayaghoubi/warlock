@@ -45,6 +45,13 @@ export const NATURE_BOLT_COLOR = '#4ce06a' // green bolt projectile / FX
 export const NATURE_ROOT_DURATION = 2.0 // seconds the target is rooted (can't move)
 export const NATURE_REGEN_PER_SEC = 2.5 // HP regenerated per second
 
+// Assassin: black bolt (no knockback); Burst is replaced by Stealth (invisibility + strike).
+export const ASSASSIN_COLOR = '#2e2c36' // assassin player body tint (near-black)
+export const SHADOW_BOLT_COLOR = '#2b2535' // black bolt projectile (white core keeps it visible)
+export const STEALTH_DURATION = 2.0 // seconds of invisibility
+export const STEALTH_COOLDOWN = 8 // W-slot cooldown for assassin stealth
+export const STEALTH_STRIKE_DAMAGE = 20 // heavy damage when passing through a foe while invisible
+
 // --- Round flow (seconds) ---
 export const COUNTDOWN_TIME = 2.2
 export const ROUNDOVER_TIME = 2.8
@@ -72,6 +79,7 @@ export const WARLOCK_KIND_LIST: { id: WarlockKind; name: string }[] = [
   { id: 'arcane', name: 'Arcane' },
   { id: 'snow', name: 'Snow' },
   { id: 'nature', name: 'Nature' },
+  { id: 'assassin', name: 'Assassin' },
 ]
 
 export const PLAYER_COLOR = '#46c6ff'

@@ -124,6 +124,10 @@ function drawWarlock(
   y: number,
   r: number,
 ): void {
+  // fade the whole warlock while invisible (assassin stealth)
+  ctx.save()
+  if (wl.invisTimer > 0) ctx.globalAlpha = 0.28
+
   // shadow
   ctx.fillStyle = 'rgba(0,0,0,0.35)'
   ctx.beginPath()
@@ -214,6 +218,8 @@ function drawWarlock(
   ctx.font = '600 12px system-ui, sans-serif'
   ctx.textAlign = 'center'
   ctx.fillText(wl.name, x, by - 5)
+
+  ctx.restore()
 }
 
 function glowDot(

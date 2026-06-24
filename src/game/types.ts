@@ -7,7 +7,7 @@ export type SpellId = 'bolt' | 'burst' | 'blink'
 
 export type MapId = 'circle' | 'square' | 'rect'
 
-export type WarlockKind = 'arcane' | 'snow' | 'nature'
+export type WarlockKind = 'arcane' | 'snow' | 'nature' | 'assassin'
 
 export interface AIState {
   thinkTimer: number
@@ -34,6 +34,7 @@ export interface Warlock {
   safeTime: number
   slowTimer: number // seconds of remaining movement slow (from ice)
   rootTimer: number // seconds of remaining root / can't-move (from nature)
+  invisTimer: number // seconds of remaining invisibility (assassin stealth)
   ai: AIState | null
 }
 

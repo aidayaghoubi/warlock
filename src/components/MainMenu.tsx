@@ -93,6 +93,7 @@ export function MainMenu() {
           <div><b>E · Blink</b> — dash toward the cursor &amp; shed knockback</div>
           <div className="muted">Snow warlock&apos;s Bolt throws ice — hits slow the target by 50%.</div>
           <div className="muted">Nature warlock&apos;s Bolt roots foes (2s) &amp; regenerates HP — but has no Blink.</div>
+          <div className="muted">Assassin&apos;s Bolt is black (no knockback); W turns invisible (2s) — pass through a foe to strike hard.</div>
           <div className="muted">The lava creeps inward each round — keep moving.</div>
         </div>
       </div>
