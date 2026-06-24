@@ -3,10 +3,23 @@ export const SIM_HZ = 60
 export const SIM_DT = 1 / SIM_HZ
 export const MAX_FRAME_DT = 0.1 // clamp huge frames (tab refocus) so physics stays sane
 
-// --- Arena ---
+// --- Arena: Circle (default) ---
 export const ARENA_RADIUS_START = 320
 export const ARENA_RADIUS_MIN = 130
 export const ARENA_SHRINK_PER_SEC = 6 // lava creeps inward during a round
+
+// --- Arena: Square ---
+export const SQUARE_HALF_START = 300 // half side-length at round start
+export const SQUARE_HALF_MIN = 120
+export const SQUARE_SHRINK_PER_SEC = 5.5
+
+// --- Arena: Rectangle (with a fixed lava square in the center) ---
+export const RECT_HALF_W_START = 380
+export const RECT_HALF_H_START = 240
+export const RECT_HALF_W_MIN = 175
+export const RECT_HALF_H_MIN = 110
+export const RECT_SHRINK_PER_SEC = 5
+export const RECT_INNER_HALF = 70 // half side-length of the central lava square (fixed)
 
 // --- Warlock ---
 export const WARLOCK_RADIUS = 16

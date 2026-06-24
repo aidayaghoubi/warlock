@@ -27,6 +27,14 @@ npm run build    # typecheck + production build
 - **E — Blink** — dash toward the cursor and shed most knockback
 - Goal: **knock enemies into the lava.** The arena shrinks each round.
 
+## Maps
+
+Pick one from the main menu (the **Arena** selector). All three shrink each round:
+
+- **Circle** — the classic shrinking disk.
+- **Square** — a shrinking square platform.
+- **Rectangle** — a wide arena with a **fixed lava square in the center** to fight around.
+
 ## Layout
 
 ```
@@ -36,6 +44,7 @@ src/
     constants.ts    # all tunable numbers (speeds, damage, knockback, cooldowns)
     math.ts         # vector helpers
     engine.ts       # game state, fixed-timestep loop, phases, physics, HUD bridge
+    maps.ts         # arena geometry: circle / square / rectangle (lava, shrink, spawns, draw)
     spells.ts       # bolt / burst / blink definitions + cast logic
     ai.ts           # bot brain (edge avoidance, range-keeping, aiming)
     input.ts        # mouse/keyboard for the local player

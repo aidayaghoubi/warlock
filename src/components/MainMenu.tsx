@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useGame } from '../store/gameStore'
+import { MAP_LIST } from '../game/maps'
 
 const BOT_OPTIONS = [1, 2, 3, 4]
 const SCORE_OPTIONS = [3, 5, 7]
@@ -9,6 +10,7 @@ export function MainMenu() {
   const config = useGame((s) => s.config)
   const [bots, setBots] = useState(config.bots)
   const [targetScore, setTargetScore] = useState(config.targetScore)
+  const [mapId, setMapId] = useState(config.mapId)
 
   return (
     <div className="menu">
@@ -48,7 +50,22 @@ export function MainMenu() {
           </div>
         </div>
 
-        <button className="play" onClick={() => startGame({ bots, targetScore })}>
+        <div className="field">
+          <label>Arena</label>
+          <div className="seg">
+            {MAP_LIST.map((m) => (
+              <button
+                key={m.id}
+                className={m.id === mapId ? 'on' : ''}
+                onClick={() => setMapId(m.id)}
+              >
+                {m.name}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <button className="play" onClick={() => startGame({ bots, targetScore, mapId })}>
           ENTER THE ARENA
         </button>
 

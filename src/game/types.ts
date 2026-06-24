@@ -5,6 +5,8 @@ export interface Vec2 {
 
 export type SpellId = 'bolt' | 'burst' | 'blink'
 
+export type MapId = 'circle' | 'square' | 'rect'
+
 export interface AIState {
   thinkTimer: number
   aimError: number
@@ -58,7 +60,7 @@ export interface GameState {
   warlocks: Warlock[]
   projectiles: Projectile[]
   particles: Particle[]
-  arenaRadius: number
+  mapId: MapId
   phase: Phase
   phaseTimer: number
   round: number

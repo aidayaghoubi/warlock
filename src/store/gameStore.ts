@@ -1,11 +1,12 @@
 import { create } from 'zustand'
-import type { HudSnapshot } from '../game/types'
+import type { HudSnapshot, MapId } from '../game/types'
 
 export type Screen = 'menu' | 'playing' | 'gameover'
 
 export interface MatchConfig {
   bots: number
   targetScore: number
+  mapId: MapId
 }
 
 interface GameStore {
@@ -23,7 +24,7 @@ interface GameStore {
 export const useGame = create<GameStore>((set) => ({
   screen: 'menu',
   gameId: 0,
-  config: { bots: 2, targetScore: 5 },
+  config: { bots: 2, targetScore: 5, mapId: 'circle' },
   hud: null,
   winner: null,
   startGame: (config) =>

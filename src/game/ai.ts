@@ -1,6 +1,7 @@
 import type { GameState, Vec2, Warlock } from './types'
 import * as C from './constants'
-import { add, angle, dist, len, norm, rand, scale, sub } from './math'
+import { add, angle, dist, norm, rand, scale, sub } from './math'
+import { MAPS } from './maps'
 import { castSpell } from './spells'
 
 /** Lightweight bot brain: avoid lava, keep range, poke with bolts, peel with burst. */
@@ -8,16 +9,17 @@ export function aiUpdate(state: GameState, bot: Warlock, dt: number): void {
   if (!bot.alive || !bot.ai) return
   const ai = bot.ai
 
-  const distCenter = len(bot.pos)
-  const danger = state.arenaRadius - distCenter // < 0 means standing in lava
+  const map = MAPS[state.mapId]
+  const t = state.roundTime
+  const danger = map.signedDanger(bot.pos, t) // < 0 means standing in lava
   const nearEdge = danger < 65
+  const safeDir = map.safeDir(bot.pos, t)
 
   // --- reactive safety, evaluated every frame ---
   if (nearEdge) {
-    bot.moveTarget = { x: 0, y: 0 }
+    bot.moveTarget = add(bot.pos, scale(safeDir, 120)) // step toward safety
     if (danger < 12 && bot.cooldowns.blink <= 0) {
-      const inward = norm(scale(bot.pos, -1))
-      castSpell(state, bot, 'blink', add(bot.pos, scale(inward, C.BLINK_RANGE)))
+      castSpell(state, bot, 'blink', add(bot.pos, scale(safeDir, C.BLINK_RANGE)))
     }
   }
 
@@ -27,7 +29,7 @@ export function aiUpdate(state: GameState, bot: Warlock, dt: number): void {
 
   const target = nearestEnemy(state, bot)
   if (!target) {
-    bot.moveTarget = { x: 0, y: 0 }
+    bot.moveTarget = map.clampToSafe(bot.pos, t, 60)
     return
   }
   bot.facing = angle(sub(target.pos, bot.pos))
@@ -50,10 +52,7 @@ export function aiUpdate(state: GameState, bot: Warlock, dt: number): void {
       const side = bot.id % 2 === 0 ? 1 : -1
       desired = add(bot.pos, { x: -toTarget.y * 120 * side, y: toTarget.x * 120 * side }) // strafe
     }
-    const dl = len(desired)
-    const maxR = state.arenaRadius - 55
-    if (dl > maxR) desired = scale(norm(desired), maxR)
-    bot.moveTarget = desired
+    bot.moveTarget = map.clampToSafe(desired, t, 55)
   }
 
   // bolt with lead + accuracy error that grows with distance

@@ -1,8 +1,9 @@
 import * as C from './constants'
-import type { GameState, HudSnapshot, Vec2, Warlock } from './types'
-import { angle, clamp, dist, fromAngle, len, norm, rand, scale, sub } from './math'
+import type { GameState, HudSnapshot, MapId, Vec2, Warlock } from './types'
+import { angle, clamp, dist, len, norm, rand, scale, sub } from './math'
 import { Input } from './input'
 import { aiUpdate } from './ai'
+import { MAPS } from './maps'
 import { applyKnockback, castSpell, dealDamage, SPELLS, SPELL_ORDER } from './spells'
 import { spawnDeath, spawnHit } from './effects'
 import { draw } from './render'
@@ -10,6 +11,7 @@ import { draw } from './render'
 export interface EngineConfig {
   bots: number
   targetScore: number
+  mapId: MapId
 }
 
 export interface EngineCallbacks {
@@ -75,7 +77,7 @@ export class Engine {
       warlocks,
       projectiles: [],
       particles: [],
-      arenaRadius: C.ARENA_RADIUS_START,
+      mapId: cfg.mapId,
       phase: 'countdown',
       phaseTimer: C.COUNTDOWN_TIME,
       round: 1,
@@ -122,7 +124,7 @@ export class Engine {
     this.dpr = dpr
     this.view.cx = w / 2
     this.view.cy = h / 2
-    this.view.scale = Math.min(w, h) / (2 * C.ARENA_RADIUS_START * 1.16)
+    this.view.scale = Math.min(w, h) / (2 * this.map.viewExtent)
   }
 
   // --- main loop (fixed timestep) ---
@@ -173,12 +175,8 @@ export class Engine {
       return
     }
 
-    // fighting
+    // fighting (arena geometry is derived from roundTime by the active map)
     s.roundTime += dt
-    s.arenaRadius = Math.max(
-      C.ARENA_RADIUS_MIN,
-      C.ARENA_RADIUS_START - C.ARENA_SHRINK_PER_SEC * s.roundTime,
-    )
 
     this.handlePlayerInput()
     for (const w of s.warlocks) aiUpdate(s, w, dt)
@@ -192,7 +190,6 @@ export class Engine {
 
   private startRound(): void {
     const s = this.state
-    s.arenaRadius = C.ARENA_RADIUS_START
     s.roundTime = 0
     s.projectiles = []
     s.particles = []
@@ -200,17 +197,15 @@ export class Engine {
     s.phase = 'countdown'
     s.phaseTimer = C.COUNTDOWN_TIME
 
-    const n = s.warlocks.length
-    const ring = C.ARENA_RADIUS_START * 0.62
+    const spawns = this.map.spawns(s.warlocks.length)
     s.warlocks.forEach((w, i) => {
-      const a = (i / n) * Math.PI * 2 - Math.PI / 2
-      w.pos = fromAngle(a, ring)
+      w.pos = spawns[i]
       w.vel = { x: 0, y: 0 }
       w.hp = w.maxHp
       w.alive = true
       w.moveTarget = null
       w.safeTime = C.SAFE_TIME
-      w.facing = angle(scale(w.pos, -1))
+      w.facing = angle(this.map.safeDir(w.pos, 0)) // face toward safety / center
       w.cooldowns = { bolt: 0, burst: 0, blink: 0 }
       if (w.ai) w.ai.thinkTimer = rand(0, 0.2)
     })
@@ -268,7 +263,7 @@ export class Engine {
     w.pos.y += w.vel.y * dt
 
     // lava damage when off the platform
-    if (w.safeTime <= 0 && len(w.pos) > this.state.arenaRadius) {
+    if (w.safeTime <= 0 && !this.map.isSafe(w.pos, this.state.roundTime)) {
       w.hp -= C.LAVA_DPS * dt
     }
 
@@ -303,7 +298,7 @@ export class Engine {
         }
       }
 
-      const off = len(p.pos) > this.state.arenaRadius + 240
+      const off = len(p.pos) > this.map.viewExtent + 240
       if (hit || p.life <= 0 || off) s.projectiles.splice(i, 1)
     }
   }
@@ -328,6 +323,10 @@ export class Engine {
 
   private player(): Warlock {
     return this.state.warlocks[0]
+  }
+
+  private get map() {
+    return MAPS[this.state.mapId]
   }
 
   private worldMouse(): Vec2 {
@@ -402,8 +401,8 @@ export class Engine {
         alive: w.alive,
         isPlayer: w.isPlayer,
       })),
-      arenaPct: s.arenaRadius / C.ARENA_RADIUS_START,
-      inLava: p.alive && len(p.pos) > s.arenaRadius,
+      arenaPct: this.map.progressPct(s.roundTime),
+      inLava: p.alive && !this.map.isSafe(p.pos, s.roundTime),
     }
   }
 }

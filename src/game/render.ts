@@ -1,5 +1,6 @@
 import type { GameState, Vec2, Warlock } from './types'
 import { clamp } from './math'
+import { MAPS } from './maps'
 
 export interface View {
   w: number
@@ -31,8 +32,7 @@ export function draw(
 
   drawLava(ctx, w, h, time)
 
-  const ar = state.arenaRadius * scale
-  drawPlatform(ctx, cx, cy, ar, time)
+  MAPS[state.mapId].draw(ctx, view, state.roundTime, time)
 
   // player aim line
   const player = state.warlocks.find((p) => p.isPlayer)
@@ -95,51 +95,6 @@ function drawLava(ctx: CanvasRenderingContext2D, w: number, h: number, time: num
     ctx.arc(x, y, r, 0, Math.PI * 2)
     ctx.fill()
   }
-}
-
-function drawPlatform(
-  ctx: CanvasRenderingContext2D,
-  cx: number,
-  cy: number,
-  ar: number,
-  time: number,
-): void {
-  // molten halo where lava meets the rim
-  const halo = ctx.createRadialGradient(cx, cy, ar * 0.88, cx, cy, ar * 1.3)
-  halo.addColorStop(0, 'rgba(255,140,40,0)')
-  halo.addColorStop(0.45, 'rgba(255,120,30,0.55)')
-  halo.addColorStop(1, 'rgba(255,80,20,0)')
-  ctx.fillStyle = halo
-  ctx.beginPath()
-  ctx.arc(cx, cy, ar * 1.3, 0, Math.PI * 2)
-  ctx.fill()
-
-  // stone disk
-  const disk = ctx.createRadialGradient(cx, cy, ar * 0.1, cx, cy, ar)
-  disk.addColorStop(0, '#454b54')
-  disk.addColorStop(0.7, '#343941')
-  disk.addColorStop(1, '#252930')
-  ctx.fillStyle = disk
-  ctx.beginPath()
-  ctx.arc(cx, cy, ar, 0, Math.PI * 2)
-  ctx.fill()
-
-  // concentric detail rings
-  ctx.strokeStyle = 'rgba(255,255,255,0.04)'
-  ctx.lineWidth = 1
-  for (let i = 1; i <= 3; i++) {
-    ctx.beginPath()
-    ctx.arc(cx, cy, (ar * i) / 4, 0, Math.PI * 2)
-    ctx.stroke()
-  }
-
-  // hot glowing rim (pulses)
-  const pulse = 0.6 + 0.4 * Math.sin(time * 3)
-  ctx.strokeStyle = `rgba(255,${120 + pulse * 60},40,${0.7 + pulse * 0.3})`
-  ctx.lineWidth = 4
-  ctx.beginPath()
-  ctx.arc(cx, cy, ar, 0, Math.PI * 2)
-  ctx.stroke()
 }
 
 function drawAim(
