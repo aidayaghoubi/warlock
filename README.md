@@ -41,7 +41,10 @@ Pick your kind from the main menu (the **Warlock** selector):
 
 - **Arcane** — the classic warlock; Bolt deals damage + knockback.
 - **Snow** — Bolt throws **ice**: same damage/knockback, and hits **slow the target's
-  movement by 50%** for a couple of seconds (shown as a dashed frost ring). Bots are Arcane.
+  movement by 50%** for a couple of seconds (shown as a dashed frost ring).
+- **Nature** — Bolt is a **green thorn** that **roots** the target in place for 2s (can't move,
+  but can still be knocked). Has **no Blink**; instead it **regenerates HP** over time. Bots are
+  Arcane.
 
 ## Layout
 

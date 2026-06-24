@@ -1,4 +1,4 @@
-import type { GameState, SpellId, Vec2, Warlock } from './types'
+import type { GameState, SpellId, Vec2, Warlock, WarlockKind } from './types'
 import * as C from './constants'
 import { add, angle, dist, fromAngle, len, norm, scale, sub } from './math'
 import { spawnRing, spawnSpray } from './effects'
@@ -18,6 +18,13 @@ export const SPELLS: Record<SpellId, SpellDef> = {
 
 export const SPELL_ORDER: SpellId[] = ['bolt', 'burst', 'blink']
 
+/** Active spells available to each warlock kind. Nature trades Blink for passive regen. */
+export const KIND_SPELLS: Record<WarlockKind, SpellId[]> = {
+  arcane: ['bolt', 'burst', 'blink'],
+  snow: ['bolt', 'burst', 'blink'],
+  nature: ['bolt', 'burst'],
+}
+
 export function applyKnockback(w: Warlock, dir: Vec2, mag: number): void {
   w.vel.x += dir.x * mag
   w.vel.y += dir.y * mag
@@ -30,6 +37,7 @@ export function dealDamage(w: Warlock, amount: number): void {
 
 /** Attempt to cast; returns true if it fired (off cooldown). */
 export function castSpell(state: GameState, caster: Warlock, id: SpellId, aim: Vec2): boolean {
+  if (!KIND_SPELLS[caster.kind].includes(id)) return false // kind doesn't have this spell
   if (caster.cooldowns[id] > 0) return false
   switch (id) {
     case 'bolt':
@@ -52,6 +60,7 @@ function castBolt(state: GameState, caster: Warlock, aim: Vec2): void {
   caster.facing = angle(dir)
   const spawn = add(caster.pos, scale(dir, caster.radius + 8))
   const isIce = caster.kind === 'snow'
+  const isNature = caster.kind === 'nature'
   state.projectiles.push({
     id: state.nextProjectileId++,
     ownerId: caster.id,
@@ -61,9 +70,10 @@ function castBolt(state: GameState, caster: Warlock, aim: Vec2): void {
     damage: C.BOLT_DAMAGE,
     knockback: C.BOLT_KNOCKBACK,
     life: C.BOLT_RANGE / C.BOLT_SPEED,
-    color: isIce ? C.ICE_COLOR : C.FIRE_COLOR,
+    color: isIce ? C.ICE_COLOR : isNature ? C.NATURE_BOLT_COLOR : C.FIRE_COLOR,
     trail: [],
     slow: isIce ? C.ICE_SLOW_DURATION : undefined,
+    root: isNature ? C.NATURE_ROOT_DURATION : undefined,
   })
 }
 

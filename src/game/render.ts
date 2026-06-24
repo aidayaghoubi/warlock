@@ -180,6 +180,24 @@ function drawWarlock(
     ctx.restore()
   }
 
+  // root ring + thorny spikes while rooted by nature
+  if (wl.rootTimer > 0) {
+    ctx.save()
+    ctx.strokeStyle = 'rgba(76,224,106,0.9)'
+    ctx.lineWidth = 3
+    ctx.beginPath()
+    ctx.arc(x, y, r * 1.4, 0, Math.PI * 2)
+    ctx.stroke()
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2
+      ctx.beginPath()
+      ctx.moveTo(x + Math.cos(a) * r * 1.4, y + Math.sin(a) * r * 1.4)
+      ctx.lineTo(x + Math.cos(a) * r * 1.75, y + Math.sin(a) * r * 1.75)
+      ctx.stroke()
+    }
+    ctx.restore()
+  }
+
   // hp bar
   const bw = r * 2.6
   const bh = 5

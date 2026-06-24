@@ -92,6 +92,7 @@ export function MainMenu() {
           <div><b>W · Burst</b> — shove everyone near you outward</div>
           <div><b>E · Blink</b> — dash toward the cursor &amp; shed knockback</div>
           <div className="muted">Snow warlock&apos;s Bolt throws ice — hits slow the target by 50%.</div>
+          <div className="muted">Nature warlock&apos;s Bolt roots foes (2s) &amp; regenerates HP — but has no Blink.</div>
           <div className="muted">The lava creeps inward each round — keep moving.</div>
         </div>
       </div>

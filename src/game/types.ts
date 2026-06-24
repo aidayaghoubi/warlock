@@ -7,7 +7,7 @@ export type SpellId = 'bolt' | 'burst' | 'blink'
 
 export type MapId = 'circle' | 'square' | 'rect'
 
-export type WarlockKind = 'arcane' | 'snow'
+export type WarlockKind = 'arcane' | 'snow' | 'nature'
 
 export interface AIState {
   thinkTimer: number
@@ -33,6 +33,7 @@ export interface Warlock {
   score: number
   safeTime: number
   slowTimer: number // seconds of remaining movement slow (from ice)
+  rootTimer: number // seconds of remaining root / can't-move (from nature)
   ai: AIState | null
 }
 
@@ -48,6 +49,7 @@ export interface Projectile {
   color: string
   trail: Vec2[]
   slow?: number // if set, seconds of movement slow applied on hit (ice bolt)
+  root?: number // if set, seconds of root / can't-move applied on hit (nature bolt)
 }
 
 export interface Particle {

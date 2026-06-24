@@ -39,6 +39,12 @@ export const ICE_COLOR = '#bdebff' // ice-bolt projectile / frost FX
 export const ICE_SLOW_FACTOR = 0.5 // movement multiplier while slowed (50%)
 export const ICE_SLOW_DURATION = 2.0 // seconds the slow lasts
 
+// Nature warlock: green bolt that roots the target; no blink, regenerates HP.
+export const NATURE_COLOR = '#6fd66f' // nature player body tint
+export const NATURE_BOLT_COLOR = '#4ce06a' // green bolt projectile / FX
+export const NATURE_ROOT_DURATION = 2.0 // seconds the target is rooted (can't move)
+export const NATURE_REGEN_PER_SEC = 2.5 // HP regenerated per second
+
 // --- Round flow (seconds) ---
 export const COUNTDOWN_TIME = 2.2
 export const ROUNDOVER_TIME = 2.8
@@ -65,6 +71,7 @@ export const BLINK_COOLDOWN = 5
 export const WARLOCK_KIND_LIST: { id: WarlockKind; name: string }[] = [
   { id: 'arcane', name: 'Arcane' },
   { id: 'snow', name: 'Snow' },
+  { id: 'nature', name: 'Nature' },
 ]
 
 export const PLAYER_COLOR = '#46c6ff'

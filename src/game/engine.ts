@@ -4,7 +4,7 @@ import { angle, clamp, dist, len, norm, rand, scale, sub } from './math'
 import { Input } from './input'
 import { aiUpdate } from './ai'
 import { MAPS } from './maps'
-import { applyKnockback, castSpell, dealDamage, SPELLS, SPELL_ORDER } from './spells'
+import { applyKnockback, castSpell, dealDamage, KIND_SPELLS, SPELLS, SPELL_ORDER } from './spells'
 import { spawnDeath, spawnHit } from './effects'
 import { draw } from './render'
 
@@ -45,6 +45,7 @@ function makeWarlock(
     score: 0,
     safeTime: 0,
     slowTimer: 0,
+    rootTimer: 0,
     ai: isPlayer ? null : { thinkTimer: 0, aimError: rand(60, 130), desiredRange: rand(175, 255) },
   }
 }
@@ -71,7 +72,8 @@ export class Engine {
   constructor(cfg: EngineConfig, cb: EngineCallbacks) {
     this.cfg = cfg
     this.cb = cb
-    const playerColor = cfg.kind === 'snow' ? C.SNOW_COLOR : C.PLAYER_COLOR
+    const playerColor =
+      cfg.kind === 'snow' ? C.SNOW_COLOR : cfg.kind === 'nature' ? C.NATURE_COLOR : C.PLAYER_COLOR
     const warlocks: Warlock[] = [makeWarlock(0, 'You', cfg.kind, playerColor, true)]
     for (let i = 0; i < cfg.bots; i++) {
       warlocks.push(
@@ -217,6 +219,7 @@ export class Engine {
       w.moveTarget = null
       w.safeTime = C.SAFE_TIME
       w.slowTimer = 0
+      w.rootTimer = 0
       w.facing = angle(this.map.safeDir(w.pos, 0)) // face toward safety / center
       w.cooldowns = { bolt: 0, burst: 0, blink: 0 }
       if (w.ai) w.ai.thinkTimer = rand(0, 0.2)
@@ -248,14 +251,15 @@ export class Engine {
     }
     if (w.safeTime > 0) w.safeTime -= dt
     if (w.slowTimer > 0) w.slowTimer -= dt
+    if (w.rootTimer > 0) w.rootTimer -= dt
 
     // knockback friction
     const decay = Math.exp(-C.FRICTION * dt)
     w.vel.x *= decay
     w.vel.y *= decay
 
-    // walking toward move target (suppressed while sliding fast)
-    if (w.moveTarget) {
+    // walking toward move target (suppressed while sliding fast or rooted)
+    if (w.moveTarget && w.rootTimer <= 0) {
       const to = sub(w.moveTarget, w.pos)
       const d = len(to)
       if (d > 5) {
@@ -279,6 +283,11 @@ export class Engine {
     // lava damage when off the platform
     if (w.safeTime <= 0 && !this.map.isSafe(w.pos, this.state.roundTime)) {
       w.hp -= C.LAVA_DPS * dt
+    }
+
+    // nature warlocks slowly regenerate health
+    if (w.kind === 'nature' && w.hp > 0) {
+      w.hp = Math.min(w.maxHp, w.hp + C.NATURE_REGEN_PER_SEC * dt)
     }
 
     if (w.hp <= 0) {
@@ -307,6 +316,7 @@ export class Engine {
           applyKnockback(w, dir, p.knockback)
           dealDamage(w, p.damage)
           if (p.slow) w.slowTimer = Math.max(w.slowTimer, p.slow)
+          if (p.root) w.rootTimer = Math.max(w.rootTimer, p.root)
           spawnHit(s, p.pos, dir, p.color)
           hit = true
           break
@@ -384,12 +394,14 @@ export class Engine {
   private buildHud(): HudSnapshot {
     const s = this.state
     const p = this.player()
-    const spells = SPELL_ORDER.map((id) => {
+    const boltName =
+      p.kind === 'snow' ? 'Frostbolt' : p.kind === 'nature' ? 'Thornbolt' : SPELLS.bolt.name
+    const spells = KIND_SPELLS[p.kind].map((id) => {
       const def = SPELLS[id]
       const cd = p.cooldowns[id]
       return {
         id,
-        name: p.kind === 'snow' && id === 'bolt' ? 'Frostbolt' : def.name,
+        name: id === 'bolt' ? boltName : def.name,
         key: def.key,
         ready: cd <= 0,
         cooldownPct: clamp(cd / def.cooldown, 0, 1),
