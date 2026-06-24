@@ -61,7 +61,7 @@ function castBolt(state: GameState, caster: Warlock, aim: Vec2): void {
     damage: C.BOLT_DAMAGE,
     knockback: C.BOLT_KNOCKBACK,
     life: C.BOLT_RANGE / C.BOLT_SPEED,
-    color: isIce ? C.ICE_COLOR : caster.color,
+    color: isIce ? C.ICE_COLOR : C.FIRE_COLOR,
     trail: [],
     slow: isIce ? C.ICE_SLOW_DURATION : undefined,
   })

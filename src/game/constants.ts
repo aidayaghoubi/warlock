@@ -34,6 +34,7 @@ export const LAVA_DPS = 28
 // --- Warlock kinds ---
 // Snow warlock's Bolt throws ice that slows the target's movement.
 export const SNOW_COLOR = '#8fd8ff' // snow player body tint
+export const FIRE_COLOR = '#ff4d3a' // arcane (fire) bolt projectile
 export const ICE_COLOR = '#bdebff' // ice-bolt projectile / frost FX
 export const ICE_SLOW_FACTOR = 0.5 // movement multiplier while slowed (50%)
 export const ICE_SLOW_DURATION = 2.0 // seconds the slow lasts
