@@ -194,6 +194,65 @@ const rect: GameMap = {
 }
 
 // ---------------------------------------------------------------------------
+// Crown — a fixed-size disk (lava does NOT shrink). Capture-the-crown scenario.
+// Spawns double as the players' home pads, spaced evenly near the border.
+// ---------------------------------------------------------------------------
+
+const CR = C.CROWN_RADIUS
+
+const crown: GameMap = {
+  id: 'crown',
+  name: 'Crown',
+  viewExtent: CR * 1.16,
+  spawns(n) {
+    const ring = CR * C.CROWN_HOME_RING
+    return Array.from({ length: n }, (_, i) => fromAngle((i / n) * Math.PI * 2 - Math.PI / 2, ring))
+  },
+  isSafe: (p) => len(p) <= CR,
+  signedDanger: (p) => CR - len(p),
+  safeDir: (p) => norm({ x: -p.x, y: -p.y }),
+  clampToSafe(p, _t, m) {
+    const r = CR - m
+    const d = len(p)
+    if (d <= r || d < 1e-6) return { x: p.x, y: p.y }
+    return { x: (p.x / d) * r, y: (p.y / d) * r }
+  },
+  progressPct: () => 1, // never shrinks
+  draw(ctx, view, _t, time) {
+    const { cx, cy, scale } = view
+    const ar = CR * scale
+
+    // molten halo where lava meets the rim
+    const halo = ctx.createRadialGradient(cx, cy, ar * 0.88, cx, cy, ar * 1.3)
+    halo.addColorStop(0, 'rgba(255,140,40,0)')
+    halo.addColorStop(0.45, 'rgba(255,120,30,0.55)')
+    halo.addColorStop(1, 'rgba(255,80,20,0)')
+    ctx.fillStyle = halo
+    ctx.beginPath()
+    ctx.arc(cx, cy, ar * 1.3, 0, Math.PI * 2)
+    ctx.fill()
+
+    // stone disk
+    const disk = ctx.createRadialGradient(cx, cy, ar * 0.1, cx, cy, ar)
+    disk.addColorStop(0, '#454b54')
+    disk.addColorStop(0.7, '#343941')
+    disk.addColorStop(1, '#252930')
+    ctx.fillStyle = disk
+    ctx.beginPath()
+    ctx.arc(cx, cy, ar, 0, Math.PI * 2)
+    ctx.fill()
+
+    // hot glowing rim (pulses)
+    const pulse = 0.6 + 0.4 * Math.sin(time * 3)
+    ctx.strokeStyle = `rgba(255,${120 + pulse * 60},40,${0.7 + pulse * 0.3})`
+    ctx.lineWidth = 4
+    ctx.beginPath()
+    ctx.arc(cx, cy, ar, 0, Math.PI * 2)
+    ctx.stroke()
+  },
+}
+
+// ---------------------------------------------------------------------------
 // Shared rectangular-platform drawing.
 // ---------------------------------------------------------------------------
 
@@ -290,10 +349,11 @@ function drawLavaSquare(
 // Registry.
 // ---------------------------------------------------------------------------
 
-export const MAPS: Record<MapId, GameMap> = { circle, square, rect }
+export const MAPS: Record<MapId, GameMap> = { circle, square, rect, crown }
 
 export const MAP_LIST: { id: MapId; name: string }[] = [
   { id: 'circle', name: circle.name },
   { id: 'square', name: square.name },
   { id: 'rect', name: rect.name },
+  { id: 'crown', name: crown.name },
 ]

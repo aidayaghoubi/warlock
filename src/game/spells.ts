@@ -48,6 +48,7 @@ export function dealDamage(w: Warlock, amount: number): void {
 /** Attempt to cast; returns true if it fired (off cooldown). */
 export function castSpell(state: GameState, caster: Warlock, id: SpellId, aim: Vec2): boolean {
   if (!KIND_SPELLS[caster.kind].includes(id)) return false // kind doesn't have this spell
+  if (id === 'blink' && state.crown?.holderId === caster.id) return false // can't blink with the crown
   if (caster.cooldowns[id] > 0) return false
   switch (id) {
     case 'bolt':

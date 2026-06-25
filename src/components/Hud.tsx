@@ -32,6 +32,16 @@ export function Hud() {
         </div>
       )}
 
+      {hud.crownActive && hud.phase === 'fighting' && (
+        <div className={`crown-hint${hud.crownYouHaveIt ? ' has' : ''}`}>
+          {hud.crownYouHaveIt
+            ? '👑 You have the CROWN — run it to your home! (no Blink)'
+            : hud.crownHolderName
+              ? `👑 ${hud.crownHolderName} has the crown — bolt them to drop it!`
+              : '👑 Grab the crown in the center'}
+        </div>
+      )}
+
       {hud.inLava && <div className="lava-warn">IN THE LAVA — GET OUT!</div>}
       {!hud.alive && hud.phase === 'fighting' && (
         <div className="lava-warn dead-note">You were eliminated — spectating…</div>

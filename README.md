@@ -34,6 +34,10 @@ Pick one from the main menu (the **Arena** selector). All three shrink each roun
 - **Circle** — the classic shrinking disk.
 - **Square** — a shrinking square platform.
 - **Rectangle** — a wide arena with a **fixed lava square in the center** to fight around.
+- **Crown** — a capture-the-crown scenario on a **fixed-size** arena (lava never shrinks):
+  a crown drops in the center; carry it to **your home pad** near the border to win the round.
+  Getting hit by any bolt knocks the crown loose back to the center, and you **can't Blink**
+  while carrying it.
 
 ## Warlocks
 

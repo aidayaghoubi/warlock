@@ -1,6 +1,7 @@
 import type { GameState, Vec2, Warlock } from './types'
 import { clamp } from './math'
 import { MAPS } from './maps'
+import { CROWN_COLOR, CROWN_HOME_RADIUS, CROWN_PICKUP_RADIUS } from './constants'
 
 export interface View {
   w: number
@@ -33,6 +34,17 @@ export function draw(
   drawLava(ctx, w, h, time)
 
   MAPS[state.mapId].draw(ctx, view, state.roundTime, time)
+
+  // crown scenario: home pads under the warlocks, plus the loose crown on the ground
+  if (state.crown) {
+    for (const wl of state.warlocks) {
+      if (!wl.home) continue
+      drawHome(ctx, sx(wl.home.x), sy(wl.home.y), sr(CROWN_HOME_RADIUS), wl.color, wl.id === state.crown.holderId)
+    }
+    if (state.crown.holderId === null) {
+      drawCrown(ctx, sx(state.crown.pos.x), sy(state.crown.pos.y), sr(CROWN_PICKUP_RADIUS) * 0.9, time, true)
+    }
+  }
 
   // player aim line
   const player = state.warlocks.find((p) => p.isPlayer)
@@ -69,9 +81,10 @@ export function draw(
   }
 
   // warlocks
+  const crownHolder = state.crown?.holderId ?? null
   for (const wl of state.warlocks) {
     if (!wl.alive) continue
-    drawWarlock(ctx, wl, sx(wl.pos.x), sy(wl.pos.y), sr(wl.radius))
+    drawWarlock(ctx, wl, sx(wl.pos.x), sy(wl.pos.y), sr(wl.radius), wl.id === crownHolder, time)
   }
 }
 
@@ -123,6 +136,8 @@ function drawWarlock(
   x: number,
   y: number,
   r: number,
+  hasCrown = false,
+  time = 0,
 ): void {
   // fade the whole warlock while invisible (assassin stealth)
   ctx.save()
@@ -219,6 +234,75 @@ function drawWarlock(
   ctx.textAlign = 'center'
   ctx.fillText(wl.name, x, by - 5)
 
+  // crown above the head while carrying it
+  if (hasCrown) drawCrown(ctx, x, by - 22, r * 0.85, time, false)
+
+  ctx.restore()
+}
+
+/** A small gold crown — on the ground (with a pickup glow) or floating above a carrier's head. */
+function drawCrown(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  s: number,
+  time: number,
+  onGround: boolean,
+): void {
+  ctx.save()
+  if (onGround) {
+    const pulse = 0.6 + 0.4 * Math.sin(time * 4)
+    const g = ctx.createRadialGradient(x, y, 0, x, y, s * 2.6)
+    g.addColorStop(0, `rgba(255,210,74,${0.45 + pulse * 0.25})`)
+    g.addColorStop(1, 'rgba(255,210,74,0)')
+    ctx.fillStyle = g
+    ctx.beginPath()
+    ctx.arc(x, y, s * 2.6, 0, Math.PI * 2)
+    ctx.fill()
+    y -= Math.sin(time * 2) * s * 0.18 // gentle bob
+  }
+
+  // crown band + three points
+  const w = s * 1.6
+  const hgt = s * 1.1
+  ctx.beginPath()
+  ctx.moveTo(x - w / 2, y + hgt / 2)
+  ctx.lineTo(x - w / 2, y - hgt / 2)
+  ctx.lineTo(x - w / 4, y) // left valley
+  ctx.lineTo(x, y - hgt * 0.8) // middle point
+  ctx.lineTo(x + w / 4, y) // right valley
+  ctx.lineTo(x + w / 2, y - hgt / 2)
+  ctx.lineTo(x + w / 2, y + hgt / 2)
+  ctx.closePath()
+  ctx.fillStyle = CROWN_COLOR
+  ctx.fill()
+  ctx.lineWidth = 1.5
+  ctx.strokeStyle = 'rgba(120,80,0,0.7)'
+  ctx.stroke()
+  ctx.restore()
+}
+
+/** A player's home pad: a colored ring near the border; brighter while they hold the crown. */
+function drawHome(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  r: number,
+  color: string,
+  active: boolean,
+): void {
+  ctx.save()
+  ctx.globalAlpha = active ? 0.9 : 0.5
+  ctx.fillStyle = hexA(color, active ? 0.22 : 0.12)
+  ctx.beginPath()
+  ctx.arc(x, y, r, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.lineWidth = 2
+  ctx.setLineDash([6, 6])
+  ctx.strokeStyle = color
+  ctx.beginPath()
+  ctx.arc(x, y, r, 0, Math.PI * 2)
+  ctx.stroke()
   ctx.restore()
 }
 

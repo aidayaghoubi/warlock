@@ -55,6 +55,7 @@ function makeWarlock(
     slowTimer: 0,
     rootTimer: 0,
     invisTimer: 0,
+    home: null,
     ai: isPlayer ? null : { thinkTimer: 0, aimError: rand(60, 130), desiredRange: rand(175, 255) },
   }
 }
@@ -113,6 +114,7 @@ export class Engine {
       targetScore: cfg.targetScore,
       nextProjectileId: 1,
       winnerName: null,
+      crown: null,
     }
     this.startRound()
   }
@@ -211,9 +213,41 @@ export class Engine {
     for (const w of s.warlocks) this.updateWarlock(w, dt)
     this.updateProjectiles(dt)
     this.updateParticles(dt)
+    if (s.crown) this.updateCrown()
+    if (s.phase !== 'fighting') return // a crown carry may have just ended the round
 
     const alive = s.warlocks.filter((w) => w.alive)
     if (alive.length <= 1) this.endRound(alive[0] ?? null)
+  }
+
+  /** Crown scenario: handle pickup, carrying, and the carry-it-home win. */
+  private updateCrown(): void {
+    const s = this.state
+    const crown = s.crown!
+
+    if (crown.holderId !== null) {
+      const holder = s.warlocks.find((w) => w.id === crown.holderId)
+      if (!holder || !holder.alive) {
+        // holder died — drop the crown back in the center
+        crown.holderId = null
+        crown.pos = { x: 0, y: 0 }
+        return
+      }
+      crown.pos = { x: holder.pos.x, y: holder.pos.y } // crown rides the carrier
+      if (holder.home && dist(holder.pos, holder.home) <= C.CROWN_HOME_RADIUS) {
+        this.endRound(holder) // carried home — round won
+      }
+      return
+    }
+
+    // loose crown: first warlock to touch it picks it up
+    for (const w of s.warlocks) {
+      if (!w.alive) continue
+      if (dist(w.pos, crown.pos) <= w.radius + C.CROWN_PICKUP_RADIUS) {
+        crown.holderId = w.id
+        break
+      }
+    }
   }
 
   private startRound(): void {
@@ -225,6 +259,7 @@ export class Engine {
     s.phase = 'countdown'
     s.phaseTimer = C.COUNTDOWN_TIME
 
+    const isCrown = s.mapId === 'crown'
     const spawns = this.map.spawns(s.warlocks.length)
     s.warlocks.forEach((w, i) => {
       w.pos = spawns[i]
@@ -236,10 +271,15 @@ export class Engine {
       w.slowTimer = 0
       w.rootTimer = 0
       w.invisTimer = 0
+      // crown scenario: spawns double as each warlock's home pad near the border
+      w.home = isCrown ? { x: spawns[i].x, y: spawns[i].y } : null
       w.facing = angle(this.map.safeDir(w.pos, 0)) // face toward safety / center
       w.cooldowns = { bolt: 0, burst: 0, blink: 0 }
       if (w.ai) w.ai.thinkTimer = rand(0, 0.2)
     })
+
+    // crown starts loose in the center; nobody holds it
+    s.crown = isCrown ? { pos: { x: 0, y: 0 }, holderId: null } : null
   }
 
   private endRound(winner: Warlock | null): void {
@@ -347,6 +387,11 @@ export class Engine {
           dealDamage(w, p.damage)
           if (p.slow) w.slowTimer = Math.max(w.slowTimer, p.slow)
           if (p.root) w.rootTimer = Math.max(w.rootTimer, p.root)
+          // a bolt to the crown-carrier knocks the crown loose, back to the center
+          if (s.crown && s.crown.holderId === w.id) {
+            s.crown.holderId = null
+            s.crown.pos = { x: 0, y: 0 }
+          }
           spawnHit(s, p.pos, dir, p.color)
           hit = true
           break
@@ -432,18 +477,20 @@ export class Engine {
           : p.kind === 'assassin'
             ? 'Shadowbolt'
             : SPELLS.bolt.name
+    const holdsCrown = s.crown?.holderId === p.id
     const spells = KIND_SPELLS[p.kind].map((id) => {
       const def = SPELLS[id]
       const cd = p.cooldowns[id]
       const maxCd = spellCooldown(p.kind, id)
       const name =
         id === 'bolt' ? boltName : id === 'burst' && p.kind === 'assassin' ? 'Stealth' : def.name
+      const blocked = id === 'blink' && holdsCrown // can't blink while carrying the crown
       return {
         id,
         name,
         key: def.key,
-        ready: cd <= 0,
-        cooldownPct: clamp(cd / maxCd, 0, 1),
+        ready: cd <= 0 && !blocked,
+        cooldownPct: blocked ? 1 : clamp(cd / maxCd, 0, 1),
       }
     })
 
@@ -469,6 +516,11 @@ export class Engine {
       })),
       arenaPct: this.map.progressPct(s.roundTime),
       inLava: p.alive && !this.map.isSafe(p.pos, s.roundTime),
+      crownActive: !!s.crown,
+      crownHolderName: s.crown?.holderId != null
+        ? (s.warlocks.find((w) => w.id === s.crown!.holderId)?.name ?? null)
+        : null,
+      crownYouHaveIt: holdsCrown,
     }
   }
 }

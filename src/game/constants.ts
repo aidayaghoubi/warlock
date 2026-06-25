@@ -52,6 +52,13 @@ export const STEALTH_DURATION = 2.0 // seconds of invisibility
 export const STEALTH_COOLDOWN = 8 // W-slot cooldown for assassin stealth
 export const STEALTH_STRIKE_DAMAGE = 20 // heavy damage when passing through a foe while invisible
 
+// --- Arena: Crown (capture-the-crown; lava does NOT shrink) ---
+export const CROWN_RADIUS = 330 // fixed arena radius (no shrink in this scenario)
+export const CROWN_HOME_RING = 0.82 // home pads sit at this fraction of the radius (near the border)
+export const CROWN_PICKUP_RADIUS = 24 // walk this close to the loose crown to grab it
+export const CROWN_HOME_RADIUS = 34 // carry the crown this close to your home to win the round
+export const CROWN_COLOR = '#ffd24a' // gold
+
 // --- Round flow (seconds) ---
 export const COUNTDOWN_TIME = 2.2
 export const ROUNDOVER_TIME = 2.8

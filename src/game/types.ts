@@ -5,7 +5,7 @@ export interface Vec2 {
 
 export type SpellId = 'bolt' | 'burst' | 'blink'
 
-export type MapId = 'circle' | 'square' | 'rect'
+export type MapId = 'circle' | 'square' | 'rect' | 'crown'
 
 export type WarlockKind = 'arcane' | 'snow' | 'nature' | 'assassin'
 
@@ -35,6 +35,7 @@ export interface Warlock {
   slowTimer: number // seconds of remaining movement slow (from ice)
   rootTimer: number // seconds of remaining root / can't-move (from nature)
   invisTimer: number // seconds of remaining invisibility (assassin stealth)
+  home: Vec2 | null // crown scenario: this warlock's home pad near the border
   ai: AIState | null
 }
 
@@ -64,6 +65,12 @@ export interface Particle {
 
 export type Phase = 'countdown' | 'fighting' | 'roundover' | 'matchover'
 
+/** Crown scenario: the crown either sits on the ground at `pos` or is carried by `holderId`. */
+export interface Crown {
+  pos: Vec2
+  holderId: number | null
+}
+
 export interface GameState {
   warlocks: Warlock[]
   projectiles: Projectile[]
@@ -76,6 +83,7 @@ export interface GameState {
   targetScore: number
   nextProjectileId: number
   winnerName: string | null
+  crown: Crown | null // non-null only in the crown scenario
 }
 
 export interface HudSpell {
@@ -106,4 +114,7 @@ export interface HudSnapshot {
   scores: HudScore[]
   arenaPct: number
   inLava: boolean
+  crownActive: boolean // crown scenario in play
+  crownHolderName: string | null // who carries the crown (null = on the ground)
+  crownYouHaveIt: boolean // the local player is carrying the crown
 }
