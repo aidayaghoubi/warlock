@@ -2,9 +2,21 @@ import { useState } from 'react'
 import { useGame } from '../store/gameStore'
 import { MAP_LIST } from '../game/maps'
 import { WARLOCK_KIND_LIST } from '../game/constants'
+import type { WarlockKind } from '../game/types'
+import arcaneImg from '../assets/heroes/arcane.jpeg'
+import snowImg from '../assets/heroes/snow.jpeg'
+import natureImg from '../assets/heroes/nature.jpeg'
+import assassinImg from '../assets/heroes/assassin.jpeg'
 
 const BOT_OPTIONS = [1, 2, 3, 4]
 const SCORE_OPTIONS = [3, 5, 7]
+
+const HERO_IMAGES: Record<WarlockKind, string> = {
+  arcane: arcaneImg,
+  snow: snowImg,
+  nature: natureImg,
+  assassin: assassinImg,
+}
 
 export function MainMenu() {
   const startGame = useGame((s) => s.startGame)
@@ -14,9 +26,34 @@ export function MainMenu() {
   const [mapId, setMapId] = useState(config.mapId)
   const [kind, setKind] = useState(config.kind)
 
+  const selectedKind = WARLOCK_KIND_LIST.find((k) => k.id === kind)
+
   return (
     <div className="menu">
-      <div className="menu-card">
+      <div className="menu-layout">
+        <div className="hero-panel">
+          <img
+            className="hero-img"
+            src={HERO_IMAGES[kind]}
+            alt={`${selectedKind?.name ?? 'Arcane'} warlock`}
+          />
+          <div className="field">
+            <label>Warlock</label>
+            <div className="seg seg-col">
+              {WARLOCK_KIND_LIST.map((k) => (
+                <button
+                  key={k.id}
+                  className={k.id === kind ? 'on' : ''}
+                  onClick={() => setKind(k.id)}
+                >
+                  {k.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="menu-card">
         <h1 className="title">
           WAR<span>LOCK</span>
         </h1>
@@ -67,21 +104,6 @@ export function MainMenu() {
           </div>
         </div>
 
-        <div className="field">
-          <label>Warlock</label>
-          <div className="seg">
-            {WARLOCK_KIND_LIST.map((k) => (
-              <button
-                key={k.id}
-                className={k.id === kind ? 'on' : ''}
-                onClick={() => setKind(k.id)}
-              >
-                {k.name}
-              </button>
-            ))}
-          </div>
-        </div>
-
         <button className="play" onClick={() => startGame({ bots, targetScore, mapId, kind })}>
           ENTER THE ARENA
         </button>
@@ -95,6 +117,7 @@ export function MainMenu() {
           <div className="muted">Nature warlock&apos;s Bolt roots foes (2s) &amp; regenerates HP — but has no Blink.</div>
           <div className="muted">Assassin&apos;s Bolt is black (no knockback); W turns invisible (2s) — pass through a foe to strike hard.</div>
           <div className="muted">The lava creeps inward each round — keep moving.</div>
+        </div>
         </div>
       </div>
     </div>
