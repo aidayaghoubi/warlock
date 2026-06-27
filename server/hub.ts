@@ -91,7 +91,7 @@ export class Hub {
         room.start(conn.id)
         break
       case 'input':
-        room.input(conn.id, msg.aim, msg.moveDown, msg.casts)
+        room.input(conn.id, msg.seq, msg.aim, msg.moveDown, msg.casts)
         break
     }
   }

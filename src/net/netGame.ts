@@ -1,20 +1,32 @@
-import type { GameState, MapId, Projectile, Vec2, Warlock } from '../game/types'
+import type { GameState, MapId, Projectile, SpellId, Vec2, Warlock } from '../game/types'
+import * as C from '../game/constants'
 import { Input } from '../game/input'
 import { MAPS } from '../game/maps'
-import { buildHud } from '../game/sim'
+import { buildHud, stepSim } from '../game/sim'
 import { draw } from '../game/render'
 import { useGame } from '../store/gameStore'
 import { net } from './client'
 import { subscribeSnapshots } from '../store/netStore'
 
-const INTERP_DELAY = 0.12 // render this many seconds behind the latest snapshot
-const INPUT_HZ = 30
+// Render this far behind the latest snapshot so we always have two frames to
+// interpolate between. At 30Hz snapshots (~33ms apart), ~70ms covers normal jitter
+// while keeping other players' lag low.
+const INTERP_DELAY = 0.07
+const INPUT_HZ = 60 // stream local intent every frame-ish, so casts/turns reach the server fast
 const HUD_INTERVAL = 0.08
 
 interface Frame {
   t: number // server time (seconds)
   state: GameState
   recvAt: number // client time (seconds) when received
+}
+
+/** A local input we've sent but the server hasn't acked yet — replayed for prediction. */
+interface PendingInput {
+  seq: number
+  aim: Vec2
+  moveDown: boolean
+  casts: SpellId[]
 }
 
 /**
@@ -38,6 +50,12 @@ export class NetGame {
   private inputAcc = 0
   private hudAcc = 0
 
+  // client-side prediction: our own warlock is simulated locally and reconciled
+  private inputSeq = 0
+  private pending: PendingInput[] = []
+  private serverAck = 0
+  private predictedLocal: Warlock | null = null
+
   private cssW = 1
   private cssH = 1
   private dpr = 1
@@ -54,9 +72,16 @@ export class NetGame {
     this.input = new Input(canvas)
     this.resize()
     window.addEventListener('resize', this.onResize)
-    this.unsub = subscribeSnapshots((t, state) => {
+    this.unsub = subscribeSnapshots((t, state, acks) => {
       this.buffer.push({ t, state, recvAt: performance.now() / 1000 })
       if (this.buffer.length > 12) this.buffer.shift()
+      // reconcile: drop inputs the server has already applied, then re-predict
+      const ack = acks[this.localId]
+      if (ack !== undefined) {
+        this.serverAck = ack
+        this.pending = this.pending.filter((p) => p.seq > ack)
+      }
+      this.repredict()
     })
     this.running = true
     this.raf = requestAnimationFrame(this.loop)
@@ -121,7 +146,36 @@ export class NetGame {
     // send on a fixed cadence, but never drop a cast: flush immediately if one fired
     if (this.inputAcc < 1 / INPUT_HZ && casts.length === 0) return
     this.inputAcc = 0
-    net.send({ type: 'input', aim: this.worldMouse(), moveDown: this.input.moveDown, casts })
+    const seq = ++this.inputSeq
+    const aim = this.worldMouse()
+    const moveDown = this.input.moveDown
+    this.pending.push({ seq, aim, moveDown, casts })
+    net.send({ type: 'input', seq, aim, moveDown, casts })
+    this.repredict()
+  }
+
+  // --- client-side prediction ----------------------------------------------
+
+  /**
+   * Re-derive our own warlock by taking its latest authoritative state and replaying
+   * every still-unacked input through the shared sim. This makes our movement and Blink
+   * feel instant while staying consistent with the server. Combat done TO us (incoming
+   * knockback/damage) stays authoritative and arrives via snapshots — we don't predict it.
+   */
+  private repredict(): void {
+    const latest = this.buffer[this.buffer.length - 1]
+    if (!latest) {
+      this.predictedLocal = null
+      return
+    }
+    const sim: GameState = structuredClone(latest.state)
+    // focus the replay on our own locomotion; don't predict others or combat resolution
+    sim.projectiles = []
+    sim.particles = []
+    for (const p of this.pending) {
+      stepSim(sim, { [this.localId]: { aim: p.aim, moveDown: p.moveDown, casts: p.casts } }, C.SIM_DT)
+    }
+    this.predictedLocal = sim.warlocks.find((w) => w.id === this.localId) ?? null
   }
 
   // --- rendering -----------------------------------------------------------
@@ -132,7 +186,7 @@ export class NetGame {
     const serverNow = latest.t + (tClient - latest.recvAt)
     const renderT = serverNow - INTERP_DELAY
 
-    const state = this.sampleAt(renderT)
+    const state = this.withPredictedLocal(this.sampleAt(renderT))
     const ctx = this.ctx
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0)
     draw(
@@ -142,6 +196,18 @@ export class NetGame {
       this.worldMouse(),
       tClient,
     )
+  }
+
+  /** Swap the interpolated (laggy) local warlock for our locally-predicted one. */
+  private withPredictedLocal(state: GameState): GameState {
+    const pred = this.predictedLocal
+    if (!pred) return state
+    return {
+      ...state,
+      warlocks: state.warlocks.map((w) =>
+        w.id === this.localId ? { ...w, pos: pred.pos, vel: pred.vel, facing: pred.facing } : w,
+      ),
+    }
   }
 
   /** Pick (and interpolate) the world state at server time `renderT`. */

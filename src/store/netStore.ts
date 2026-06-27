@@ -15,7 +15,7 @@ export interface MatchInfo {
 
 // Snapshots arrive ~20Hz and must NOT go through React state (it would thrash the UI).
 // The in-match controller subscribes here for the raw stream instead.
-type SnapshotListener = (serverTime: number, state: GameState) => void
+type SnapshotListener = (serverTime: number, state: GameState, acks: Record<number, number>) => void
 const snapshotListeners = new Set<SnapshotListener>()
 
 export function subscribeSnapshots(cb: SnapshotListener): () => void {
@@ -141,7 +141,7 @@ function handle(msg: ServerMsg, set: Setter, get: Getter): void {
       break
 
     case 'snapshot':
-      for (const cb of snapshotListeners) cb(msg.serverTime, msg.state)
+      for (const cb of snapshotListeners) cb(msg.serverTime, msg.state, msg.acks)
       break
 
     case 'matchOver':

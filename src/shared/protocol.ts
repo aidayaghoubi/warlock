@@ -68,8 +68,9 @@ export type ClientMsg =
   | { type: 'setConfig'; mapId?: MapId; targetScore?: number }
   /** Host only: lock the lobby and start the match. */
   | { type: 'startMatch' }
-  /** During play: this client's control intent for the current moment. */
-  | { type: 'input'; aim: Vec2; moveDown: boolean; casts: SpellId[] }
+  /** During play: this client's control intent. `seq` lets the server ack progress
+   *  so the client can reconcile its local prediction. */
+  | { type: 'input'; seq: number; aim: Vec2; moveDown: boolean; casts: SpellId[] }
 
 // --- server -> client --------------------------------------------------------
 
@@ -84,8 +85,10 @@ export type ServerMsg =
   | { type: 'lobbyClosed'; reason: string }
   /** The match is starting; `localWarlockId` is the warlock this client controls. */
   | { type: 'matchStart'; localWarlockId: number; mapId: MapId; targetScore: number }
-  /** Periodic authoritative world state for rendering. `serverTime` is seconds. */
-  | { type: 'snapshot'; serverTime: number; state: GameState }
+  /** Periodic authoritative world state for rendering. `serverTime` is seconds.
+   *  `acks` maps each warlock id to the last input `seq` the server has applied for
+   *  it, so a client can drop reconciled inputs and replay only the rest. */
+  | { type: 'snapshot'; serverTime: number; state: GameState; acks: Record<number, number> }
   /** The match ended. */
   | { type: 'matchOver'; winner: string | null }
   /** A request failed (bad code, lobby full, not host, etc.). */

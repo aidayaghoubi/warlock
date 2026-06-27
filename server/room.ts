@@ -9,7 +9,7 @@ import {
   type ServerMsg,
 } from '../src/shared/protocol'
 
-const SNAPSHOT_HZ = 20
+const SNAPSHOT_HZ = 30
 const SNAPSHOT_INTERVAL = 1 / SNAPSHOT_HZ
 
 /** A connected human inside a room. */
@@ -21,6 +21,7 @@ interface Member {
   send: (msg: ServerMsg) => void
   warlockId: number | null // seat index once the match starts
   intent: PlayerIntent // latest control state (persists between sim steps)
+  lastInputSeq: number // highest input seq received (echoed back for client reconciliation)
 }
 
 function freshIntent(): PlayerIntent {
@@ -83,6 +84,7 @@ export class Room {
       send: member.send,
       warlockId: null,
       intent: freshIntent(),
+      lastInputSeq: 0,
     })
     if (first) this.hostId = member.id
     this.clampBots()
@@ -193,12 +195,22 @@ export class Room {
   }
 
   /** Record a player's latest control intent (called from the network layer). */
-  input(connId: string, aim: Vec2, moveDown: boolean, casts: SpellId[]): void {
+  input(connId: string, seq: number, aim: Vec2, moveDown: boolean, casts: SpellId[]): void {
     const m = this.member(connId)
     if (!m || m.warlockId === null) return
+    if (seq > m.lastInputSeq) m.lastInputSeq = seq
     m.intent.aim = aim
     m.intent.moveDown = moveDown
     if (casts.length) m.intent.casts.push(...casts)
+  }
+
+  /** Per-warlock map of the last input seq the server has applied — for client reconciliation. */
+  private acks(): Record<number, number> {
+    const acks: Record<number, number> = {}
+    for (const m of this.members) {
+      if (m.warlockId !== null) acks[m.warlockId] = m.lastInputSeq
+    }
+    return acks
   }
 
   private tick = (): void => {
@@ -224,7 +236,7 @@ export class Room {
     this.snapAcc += dt
     if (this.snapAcc >= SNAPSHOT_INTERVAL) {
       this.snapAcc = 0
-      this.broadcast({ type: 'snapshot', serverTime: this.serverTime, state: this.state })
+      this.broadcast({ type: 'snapshot', serverTime: this.serverTime, state: this.state, acks: this.acks() })
     }
   }
 
@@ -243,7 +255,7 @@ export class Room {
     if (this.timer) clearInterval(this.timer)
     this.timer = null
     const winner = this.state?.winnerName ?? null
-    this.broadcast({ type: 'snapshot', serverTime: this.serverTime, state: this.state! })
+    this.broadcast({ type: 'snapshot', serverTime: this.serverTime, state: this.state!, acks: this.acks() })
     this.broadcast({ type: 'matchOver', winner })
 
     // revert to the lobby so the group can play again
@@ -252,6 +264,7 @@ export class Room {
     for (const m of this.members) {
       m.warlockId = null
       m.ready = false
+      m.lastInputSeq = 0
     }
     this.broadcastLobby()
     this.onChanged()
