@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useGame } from '../store/gameStore'
+import { useNet } from '../store/netStore'
 import { MAP_LIST } from '../game/maps'
 import { WARLOCK_KIND_LIST } from '../game/constants'
 import type { WarlockKind } from '../game/types'
@@ -21,10 +22,14 @@ const HERO_IMAGES: Record<WarlockKind, string> = {
 export function MainMenu() {
   const startGame = useGame((s) => s.startGame)
   const config = useGame((s) => s.config)
+  const browseLobbies = useNet((s) => s.browseLobbies)
+  const savedName = useNet((s) => s.name)
   const [bots, setBots] = useState(config.bots)
   const [targetScore, setTargetScore] = useState(config.targetScore)
   const [mapId, setMapId] = useState(config.mapId)
   const [kind, setKind] = useState(config.kind)
+  const [tab, setTab] = useState<'solo' | 'online'>('solo')
+  const [name, setName] = useState(savedName)
 
   const selectedKind = WARLOCK_KIND_LIST.find((k) => k.id === kind)
 
@@ -59,6 +64,37 @@ export function MainMenu() {
         </h1>
         <p className="tagline">Knock your rivals into the lava. Last wizard standing wins.</p>
 
+        <div className="seg tabbar">
+          <button className={tab === 'solo' ? 'on' : ''} onClick={() => setTab('solo')}>
+            Solo
+          </button>
+          <button className={tab === 'online' ? 'on' : ''} onClick={() => setTab('online')}>
+            Multiplayer
+          </button>
+        </div>
+
+        {tab === 'online' && (
+          <div className="online-panel">
+            <div className="field">
+              <label>Your name</label>
+              <input
+                className="name-input"
+                value={name}
+                maxLength={16}
+                placeholder="Enter a name"
+                onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && browseLobbies(name)}
+              />
+            </div>
+            <button className="play" onClick={() => browseLobbies(name)}>
+              PLAY ONLINE
+            </button>
+            <p className="muted">Browse open lobbies or create your own. Free-for-all arena vs other players (and bots).</p>
+          </div>
+        )}
+
+        {tab === 'solo' && (
+        <>
         <div className="field">
           <label>Opponents (AI bots)</label>
           <div className="seg">
@@ -107,6 +143,8 @@ export function MainMenu() {
         <button className="play" onClick={() => startGame({ bots, targetScore, mapId, kind })}>
           ENTER THE ARENA
         </button>
+        </>
+        )}
 
         <div className="howto">
           <div><b>Move</b> — click or hold the mouse on the ground</div>

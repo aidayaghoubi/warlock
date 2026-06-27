@@ -92,3 +92,14 @@ export const WARLOCK_KIND_LIST: { id: WarlockKind; name: string }[] = [
 export const PLAYER_COLOR = '#46c6ff'
 export const BOT_COLORS = ['#ff5a5a', '#7be36a', '#ffd24a', '#c77dff', '#ff9d3a']
 export const BOT_NAMES = ['Grommash', 'Sylvana', 'Kelthar', 'Mannoroth', 'Vexa']
+
+/** Body tint for a human player's chosen warlock kind. */
+export function playerColorForKind(kind: WarlockKind): string {
+  return kind === 'snow'
+    ? SNOW_COLOR
+    : kind === 'nature'
+      ? NATURE_COLOR
+      : kind === 'assassin'
+        ? ASSASSIN_COLOR
+        : PLAYER_COLOR
+}

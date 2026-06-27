@@ -1,19 +1,9 @@
 import * as C from './constants'
-import type { GameState, HudSnapshot, MapId, Vec2, Warlock, WarlockKind } from './types'
-import { angle, clamp, dist, len, norm, rand, scale, sub } from './math'
+import type { GameState, HudSnapshot, MapId, Vec2, WarlockKind } from './types'
+import { angle, sub } from './math'
 import { Input } from './input'
-import { aiUpdate } from './ai'
+import { buildHud, createGameState, stepSim, type IntentMap, type Seat } from './sim'
 import { MAPS } from './maps'
-import {
-  applyKnockback,
-  castSpell,
-  dealDamage,
-  KIND_SPELLS,
-  spellCooldown,
-  SPELLS,
-  SPELL_ORDER,
-} from './spells'
-import { spawnDeath, spawnHit } from './effects'
 import { draw } from './render'
 
 export interface EngineConfig {
@@ -28,44 +18,34 @@ export interface EngineCallbacks {
   onMatchOver: (winner: string | null) => void
 }
 
-function makeWarlock(
-  id: number,
-  name: string,
-  kind: WarlockKind,
-  color: string,
-  isPlayer: boolean,
-): Warlock {
-  return {
-    id,
-    name,
-    kind,
-    color,
-    isPlayer,
-    alive: true,
-    pos: { x: 0, y: 0 },
-    vel: { x: 0, y: 0 },
-    radius: C.WARLOCK_RADIUS,
-    hp: C.WARLOCK_MAX_HP,
-    maxHp: C.WARLOCK_MAX_HP,
-    moveTarget: null,
-    facing: 0,
-    cooldowns: { bolt: 0, burst: 0, blink: 0 },
-    score: 0,
-    safeTime: 0,
-    slowTimer: 0,
-    rootTimer: 0,
-    invisTimer: 0,
-    home: null,
-    ai: isPlayer ? null : { thinkTimer: 0, aimError: rand(60, 130), desiredRange: rand(175, 255) },
+/** Build the seat list for a solo match: the human in seat 0, then AI bots. */
+function soloSeats(cfg: EngineConfig): Seat[] {
+  const seats: Seat[] = [
+    { name: 'You', kind: cfg.kind, color: C.playerColorForKind(cfg.kind), isBot: false, isLocal: true },
+  ]
+  for (let i = 0; i < cfg.bots; i++) {
+    seats.push({
+      name: C.BOT_NAMES[i % C.BOT_NAMES.length],
+      kind: 'arcane',
+      color: C.BOT_COLORS[i % C.BOT_COLORS.length],
+      isBot: true,
+      isLocal: false,
+    })
   }
+  return seats
 }
 
+/**
+ * Solo (single-player) client engine. Owns the canvas, input, render loop, and runs
+ * the authoritative {@link stepSim} locally — there is no server in solo play. The
+ * simulation itself lives in `sim.ts` and is shared with the multiplayer server.
+ */
 export class Engine {
   private canvas!: HTMLCanvasElement
   private ctx!: CanvasRenderingContext2D
   private input!: Input
-  private readonly cfg: EngineConfig
   private readonly cb: EngineCallbacks
+  private readonly localId = 0 // the human player is always seat 0 in solo
 
   state: GameState
   private raf = 0
@@ -73,6 +53,7 @@ export class Engine {
   private acc = 0
   private running = false
   private hudTimer = 0
+  private matchOverFired = false
 
   private cssW = 1
   private cssH = 1
@@ -80,43 +61,12 @@ export class Engine {
   private view = { cx: 0, cy: 0, scale: 1 }
 
   constructor(cfg: EngineConfig, cb: EngineCallbacks) {
-    this.cfg = cfg
     this.cb = cb
-    const playerColor =
-      cfg.kind === 'snow'
-        ? C.SNOW_COLOR
-        : cfg.kind === 'nature'
-          ? C.NATURE_COLOR
-          : cfg.kind === 'assassin'
-            ? C.ASSASSIN_COLOR
-            : C.PLAYER_COLOR
-    const warlocks: Warlock[] = [makeWarlock(0, 'You', cfg.kind, playerColor, true)]
-    for (let i = 0; i < cfg.bots; i++) {
-      warlocks.push(
-        makeWarlock(
-          i + 1,
-          C.BOT_NAMES[i % C.BOT_NAMES.length],
-          'arcane',
-          C.BOT_COLORS[i % C.BOT_COLORS.length],
-          false,
-        ),
-      )
-    }
-    this.state = {
-      warlocks,
-      projectiles: [],
-      particles: [],
-      mapId: cfg.mapId,
-      phase: 'countdown',
-      phaseTimer: C.COUNTDOWN_TIME,
-      round: 1,
-      roundTime: 0,
+    this.state = createGameState({
+      seats: soloSeats(cfg),
       targetScore: cfg.targetScore,
-      nextProjectileId: 1,
-      winnerName: null,
-      crown: null,
-    }
-    this.startRound()
+      mapId: cfg.mapId,
+    })
   }
 
   // --- lifecycle ---
@@ -167,263 +117,29 @@ export class Engine {
     this.acc += dt
     let steps = 0
     while (this.acc >= C.SIM_DT && steps < 6) {
-      this.step(C.SIM_DT)
+      stepSim(this.state, this.collectIntents(), C.SIM_DT)
       this.acc -= C.SIM_DT
       steps++
+      this.checkMatchOver()
     }
     this.render()
     this.hudTimer -= dt
     if (this.hudTimer <= 0) {
-      this.cb.onHud(this.buildHud())
+      this.cb.onHud(buildHud(this.state, this.localId))
       this.hudTimer = 0.07
     }
     this.raf = requestAnimationFrame(this.loop)
   }
 
-  // --- simulation ---
-
-  private step(dt: number): void {
-    const s = this.state
-    if (s.phase === 'matchover') return
-
-    if (s.phase === 'countdown') {
-      s.phaseTimer -= dt
-      this.updatePlayerFacing()
-      this.updateParticles(dt)
-      if (s.phaseTimer <= 0) s.phase = 'fighting'
-      return
-    }
-
-    if (s.phase === 'roundover') {
-      s.phaseTimer -= dt
-      this.updateProjectiles(dt)
-      this.updateParticles(dt)
-      if (s.phaseTimer <= 0) {
-        s.round += 1
-        this.startRound()
-      }
-      return
-    }
-
-    // fighting (arena geometry is derived from roundTime by the active map)
-    s.roundTime += dt
-
-    this.handlePlayerInput()
-    for (const w of s.warlocks) aiUpdate(s, w, dt)
-    for (const w of s.warlocks) this.updateWarlock(w, dt)
-    this.updateProjectiles(dt)
-    this.updateParticles(dt)
-    if (s.crown) this.updateCrown()
-    if (s.phase !== 'fighting') return // a crown carry may have just ended the round
-
-    const alive = s.warlocks.filter((w) => w.alive)
-    if (alive.length <= 1) this.endRound(alive[0] ?? null)
-  }
-
-  /** Crown scenario: handle pickup, carrying, and the carry-it-home win. */
-  private updateCrown(): void {
-    const s = this.state
-    const crown = s.crown!
-
-    if (crown.holderId !== null) {
-      const holder = s.warlocks.find((w) => w.id === crown.holderId)
-      if (!holder || !holder.alive) {
-        // holder died — drop the crown back in the center
-        crown.holderId = null
-        crown.pos = { x: 0, y: 0 }
-        return
-      }
-      crown.pos = { x: holder.pos.x, y: holder.pos.y } // crown rides the carrier
-      if (holder.home && dist(holder.pos, holder.home) <= C.CROWN_HOME_RADIUS) {
-        this.endRound(holder) // carried home — round won
-      }
-      return
-    }
-
-    // loose crown: first warlock to touch it picks it up
-    for (const w of s.warlocks) {
-      if (!w.alive) continue
-      if (dist(w.pos, crown.pos) <= w.radius + C.CROWN_PICKUP_RADIUS) {
-        crown.holderId = w.id
-        break
-      }
-    }
-  }
-
-  private startRound(): void {
-    const s = this.state
-    s.roundTime = 0
-    s.projectiles = []
-    s.particles = []
-    s.winnerName = null
-    s.phase = 'countdown'
-    s.phaseTimer = C.COUNTDOWN_TIME
-
-    const isCrown = s.mapId === 'crown'
-    const spawns = this.map.spawns(s.warlocks.length)
-    s.warlocks.forEach((w, i) => {
-      w.pos = spawns[i]
-      w.vel = { x: 0, y: 0 }
-      w.hp = w.maxHp
-      w.alive = true
-      w.moveTarget = null
-      w.safeTime = C.SAFE_TIME
-      w.slowTimer = 0
-      w.rootTimer = 0
-      w.invisTimer = 0
-      // crown scenario: spawns double as each warlock's home pad near the border
-      w.home = isCrown ? { x: spawns[i].x, y: spawns[i].y } : null
-      w.facing = angle(this.map.safeDir(w.pos, 0)) // face toward safety / center
-      w.cooldowns = { bolt: 0, burst: 0, blink: 0 }
-      if (w.ai) w.ai.thinkTimer = rand(0, 0.2)
-    })
-
-    // crown starts loose in the center; nobody holds it
-    s.crown = isCrown ? { pos: { x: 0, y: 0 }, holderId: null } : null
-  }
-
-  private endRound(winner: Warlock | null): void {
-    const s = this.state
-    if (s.phase !== 'fighting') return
-    s.winnerName = winner ? winner.name : null
-    if (winner) {
-      winner.score += 1
-      if (winner.score >= s.targetScore) {
-        s.phase = 'matchover'
-        this.cb.onHud(this.buildHud())
-        this.cb.onMatchOver(winner.name)
-        return
-      }
-    }
-    s.phase = 'roundover'
-    s.phaseTimer = C.ROUNDOVER_TIME
-  }
-
-  private updateWarlock(w: Warlock, dt: number): void {
-    if (!w.alive) return
-
-    for (const id of SPELL_ORDER) {
-      if (w.cooldowns[id] > 0) w.cooldowns[id] = Math.max(0, w.cooldowns[id] - dt)
-    }
-    if (w.safeTime > 0) w.safeTime -= dt
-    if (w.slowTimer > 0) w.slowTimer -= dt
-    if (w.rootTimer > 0) w.rootTimer -= dt
-    if (w.invisTimer > 0) w.invisTimer -= dt
-
-    // knockback friction
-    const decay = Math.exp(-C.FRICTION * dt)
-    w.vel.x *= decay
-    w.vel.y *= decay
-
-    // walking toward move target (suppressed while sliding fast or rooted)
-    if (w.moveTarget && w.rootTimer <= 0) {
-      const to = sub(w.moveTarget, w.pos)
-      const d = len(to)
-      if (d > 5) {
-        const speed = len(w.vel)
-        const factor = clamp(1 - speed / C.WALK_CANCEL_SPEED, 0, 1)
-        if (factor > 0) {
-          const walk = C.WALK_SPEED * (w.slowTimer > 0 ? C.ICE_SLOW_FACTOR : 1)
-          const dir = scale(to, 1 / d)
-          w.pos.x += dir.x * walk * factor * dt
-          w.pos.y += dir.y * walk * factor * dt
-        }
-      } else {
-        w.moveTarget = null
-      }
-    }
-
-    // knockback slide
-    w.pos.x += w.vel.x * dt
-    w.pos.y += w.vel.y * dt
-
-    // assassin stealth: passing through a foe while invisible strikes hard (and breaks stealth)
-    if (w.kind === 'assassin' && w.invisTimer > 0) {
-      for (const e of this.state.warlocks) {
-        if (e.id === w.id || !e.alive || e.safeTime > 0) continue
-        if (dist(w.pos, e.pos) <= w.radius + e.radius) {
-          dealDamage(e, C.STEALTH_STRIKE_DAMAGE)
-          spawnHit(this.state, e.pos, norm(sub(e.pos, w.pos)), C.SHADOW_BOLT_COLOR)
-          w.invisTimer = 0
-          break
-        }
-      }
-    }
-
-    // lava damage when off the platform
-    if (w.safeTime <= 0 && !this.map.isSafe(w.pos, this.state.roundTime)) {
-      w.hp -= C.LAVA_DPS * dt
-    }
-
-    // nature warlocks slowly regenerate health
-    if (w.kind === 'nature' && w.hp > 0) {
-      w.hp = Math.min(w.maxHp, w.hp + C.NATURE_REGEN_PER_SEC * dt)
-    }
-
-    if (w.hp <= 0) {
-      w.hp = 0
-      w.alive = false
-      w.moveTarget = null
-      spawnDeath(this.state, w.pos, w.color)
-    }
-  }
-
-  private updateProjectiles(dt: number): void {
-    const s = this.state
-    for (let i = s.projectiles.length - 1; i >= 0; i--) {
-      const p = s.projectiles[i]
-      p.pos.x += p.vel.x * dt
-      p.pos.y += p.vel.y * dt
-      p.life -= dt
-      p.trail.push({ x: p.pos.x, y: p.pos.y })
-      if (p.trail.length > 8) p.trail.shift()
-
-      let hit = false
-      for (const w of s.warlocks) {
-        if (!w.alive || w.id === p.ownerId || w.safeTime > 0) continue
-        if (dist(p.pos, w.pos) <= p.radius + w.radius) {
-          const dir = norm(p.vel)
-          applyKnockback(w, dir, p.knockback)
-          dealDamage(w, p.damage)
-          if (p.slow) w.slowTimer = Math.max(w.slowTimer, p.slow)
-          if (p.root) w.rootTimer = Math.max(w.rootTimer, p.root)
-          // a bolt to the crown-carrier knocks the crown loose, back to the center
-          if (s.crown && s.crown.holderId === w.id) {
-            s.crown.holderId = null
-            s.crown.pos = { x: 0, y: 0 }
-          }
-          spawnHit(s, p.pos, dir, p.color)
-          hit = true
-          break
-        }
-      }
-
-      const off = len(p.pos) > this.map.viewExtent + 240
-      if (hit || p.life <= 0 || off) s.projectiles.splice(i, 1)
-    }
-  }
-
-  private updateParticles(dt: number): void {
-    const ps = this.state.particles
-    for (let i = ps.length - 1; i >= 0; i--) {
-      const p = ps[i]
-      p.life -= dt
-      if (p.life <= 0) {
-        ps.splice(i, 1)
-        continue
-      }
-      p.pos.x += p.vel.x * dt
-      p.pos.y += p.vel.y * dt
-      p.vel.x *= 0.92
-      p.vel.y *= 0.92
+  private checkMatchOver(): void {
+    if (this.state.phase === 'matchover' && !this.matchOverFired) {
+      this.matchOverFired = true
+      this.cb.onHud(buildHud(this.state, this.localId))
+      this.cb.onMatchOver(this.state.winnerName)
     }
   }
 
   // --- input ---
-
-  private player(): Warlock {
-    return this.state.warlocks[0]
-  }
 
   private get map() {
     return MAPS[this.state.mapId]
@@ -437,22 +153,19 @@ export class Engine {
     }
   }
 
-  private updatePlayerFacing(): void {
-    const p = this.player()
-    if (!p.alive) return
-    p.facing = angle(sub(this.worldMouse(), p.pos))
+  /** Translate the local mouse/keyboard into the sim's intent for our warlock. */
+  private collectIntents(): IntentMap {
+    const aim = this.worldMouse()
+    return {
+      [this.localId]: {
+        aim,
+        moveDown: this.input.moveDown,
+        casts: this.input.consumeCasts(),
+      },
+    }
   }
 
-  private handlePlayerInput(): void {
-    const p = this.player()
-    if (!p.alive) return
-    const m = this.worldMouse()
-    p.facing = angle(sub(m, p.pos))
-    if (this.input.moveDown) p.moveTarget = { x: m.x, y: m.y }
-    for (const id of this.input.consumeCasts()) castSpell(this.state, p, id, m)
-  }
-
-  // --- render + HUD ---
+  // --- render ---
 
   private render(): void {
     const ctx = this.ctx
@@ -464,63 +177,5 @@ export class Engine {
       this.worldMouse(),
       performance.now() / 1000,
     )
-  }
-
-  private buildHud(): HudSnapshot {
-    const s = this.state
-    const p = this.player()
-    const boltName =
-      p.kind === 'snow'
-        ? 'Frostbolt'
-        : p.kind === 'nature'
-          ? 'Thornbolt'
-          : p.kind === 'assassin'
-            ? 'Shadowbolt'
-            : SPELLS.bolt.name
-    const holdsCrown = s.crown?.holderId === p.id
-    const spells = KIND_SPELLS[p.kind].map((id) => {
-      const def = SPELLS[id]
-      const cd = p.cooldowns[id]
-      const maxCd = spellCooldown(p.kind, id)
-      const name =
-        id === 'bolt' ? boltName : id === 'burst' && p.kind === 'assassin' ? 'Stealth' : def.name
-      const blocked = id === 'blink' && holdsCrown // can't blink while carrying the crown
-      return {
-        id,
-        name,
-        key: def.key,
-        ready: cd <= 0 && !blocked,
-        cooldownPct: blocked ? 1 : clamp(cd / maxCd, 0, 1),
-      }
-    })
-
-    let banner = ''
-    if (s.phase === 'countdown') banner = `Round ${s.round}`
-    else if (s.phase === 'roundover') banner = s.winnerName ? `${s.winnerName} wins the round!` : 'Draw!'
-
-    return {
-      alive: p.alive,
-      hp: Math.max(0, Math.ceil(p.hp)),
-      maxHp: p.maxHp,
-      spells,
-      round: s.round,
-      phase: s.phase,
-      phaseTimer: Math.max(0, s.phaseTimer),
-      banner,
-      scores: s.warlocks.map((w) => ({
-        name: w.name,
-        color: w.color,
-        score: w.score,
-        alive: w.alive,
-        isPlayer: w.isPlayer,
-      })),
-      arenaPct: this.map.progressPct(s.roundTime),
-      inLava: p.alive && !this.map.isSafe(p.pos, s.roundTime),
-      crownActive: !!s.crown,
-      crownHolderName: s.crown?.holderId != null
-        ? (s.warlocks.find((w) => w.id === s.crown!.holderId)?.name ?? null)
-        : null,
-      crownYouHaveIt: holdsCrown,
-    }
   }
 }

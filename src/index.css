@@ -238,6 +238,164 @@ body {
   opacity: 0.8;
 }
 
+/* ---------- Multiplayer: tabs / lobbies ---------- */
+.tabbar {
+  margin-bottom: 18px;
+}
+.online-panel {
+  margin-bottom: 8px;
+}
+.name-input {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  outline: none;
+  box-sizing: border-box;
+}
+.name-input:focus {
+  border-color: #ff9b4a;
+}
+
+.lobby-card {
+  max-width: 460px;
+  width: 100%;
+}
+.lobby-error {
+  margin: -6px 0 14px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(255, 80, 60, 0.14);
+  border: 1px solid rgba(255, 80, 60, 0.4);
+  color: #ffb4ab;
+  font-size: 13px;
+}
+
+.lobby-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.lobby-empty {
+  padding: 18px;
+  text-align: center;
+  color: var(--muted);
+  font-style: italic;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+}
+.lobby-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.lobby-row-main {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+.lobby-code {
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: #ffb24a;
+}
+.lobby-meta {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lobby-count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--text);
+}
+.mini {
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a0d06;
+  background: linear-gradient(180deg, #ffb24a, #ff6a20);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.mini:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.create-box {
+  margin-top: 6px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+/* ---------- Multiplayer: lobby room roster ---------- */
+.roster {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.roster-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.roster-row.ready {
+  border-color: rgba(120, 230, 120, 0.5);
+  background: rgba(120, 230, 120, 0.08);
+}
+.roster-row.bot {
+  opacity: 0.7;
+}
+.roster-row .dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.roster-name {
+  flex: 1;
+  text-align: left;
+  font-weight: 700;
+  color: var(--text);
+}
+.roster-kind {
+  font-size: 12px;
+  text-transform: capitalize;
+  color: var(--muted);
+}
+.roster-flag {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--muted);
+}
+.roster-row.ready .roster-flag {
+  color: #7be36a;
+}
+.play:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
 /* ---------- HUD ---------- */
 .hud {
   position: absolute;

@@ -15,9 +15,27 @@ first to the round target wins the match. Single-player vs AI bots.
 
 ```bash
 npm install
-npm run dev      # http://localhost:5173
+npm run dev      # http://localhost:5173  — client (Solo + Multiplayer UI)
+npm run server   # ws://localhost:8787    — authoritative multiplayer server
 npm run build    # typecheck + production build
 ```
+
+**Solo** play runs entirely in the browser (no server needed). **Multiplayer** needs
+`npm run server` running alongside `npm run dev`; open the client in two browser tabs,
+go to the **Multiplayer** tab, and create / join a lobby.
+
+## Architecture (multiplayer)
+
+- The simulation in [`src/game/sim.ts`](src/game/sim.ts) is a pure, DOM-free
+  fixed-timestep core (`stepSim(state, intents, dt)`) shared by client and server.
+- **Solo** ([`engine.ts`](src/game/engine.ts)) runs `stepSim` locally against mouse/keyboard.
+- **Multiplayer** is **server-authoritative**: the [`server/`](server/) Node process runs
+  `stepSim` per room and broadcasts world snapshots at 20 Hz; clients send only their
+  *intent* (aim, move, casts) and render snapshots with entity interpolation
+  ([`netGame.ts`](src/net/netGame.ts)). The wire protocol is in
+  [`src/shared/protocol.ts`](src/shared/protocol.ts).
+- Public lobbies (browse → join by code), host-set bots, lobby-only joins (locked at match
+  start). The server owns the game, so the host is purely a lobby-settings role.
 
 ## Controls
 
