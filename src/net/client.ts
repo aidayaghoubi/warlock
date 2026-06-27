@@ -6,10 +6,23 @@ import {
   type ServerMsg,
 } from '../shared/protocol'
 
-/** Default dev endpoint: same host as the page, fixed game port. */
+/**
+ * Resolve the multiplayer server endpoint.
+ *
+ * Priority:
+ *  1. `VITE_SERVER_URL` baked in at build time (e.g. `wss://play.example.com/ws`)
+ *     — use this for any real deployment behind a reverse proxy.
+ *  2. Auto-derive from the page: same host as the page, matching protocol
+ *     (`wss://` when served over HTTPS, `ws://` otherwise), on the fixed game port.
+ *     This is the convenient dev / bare-IP default.
+ */
 export function defaultServerUrl(): string {
-  const host = typeof location !== 'undefined' ? location.hostname : 'localhost'
-  return `ws://${host}:${DEFAULT_PORT}`
+  const configured = import.meta.env?.VITE_SERVER_URL
+  if (configured) return configured
+
+  if (typeof location === 'undefined') return `ws://localhost:${DEFAULT_PORT}`
+  const scheme = location.protocol === 'https:' ? 'wss' : 'ws'
+  return `${scheme}://${location.hostname}:${DEFAULT_PORT}`
 }
 
 type MsgHandler = (msg: ServerMsg) => void
